@@ -178,7 +178,11 @@ export default function RetirementProjection({ data }: Props) {
                             tickFormatter={value => `£${(value / 1000).toFixed(0)}k`}
                         />
                         <Tooltip
-                            formatter={(value: number) => [`£${value.toLocaleString()}`, ""]}
+                            labelFormatter={(label: any) => `Year ${label}`}
+                            formatter={(value: number, name: string) => [
+                                `£${Number(value || 0).toLocaleString()}`,
+                                name || ""
+                            ]}
                             contentStyle={{ background: "white", border: "2px solid #e5e7eb", borderRadius: "8px" }}
                         />
                         <Legend />

@@ -74,105 +74,74 @@ export function calculateProjection(data: RetirementData, maxYears: number = Inf
     /**
      * RUN SHORTFALL CALCULATION
      */
-    function run_shortfall_calculation(
-        shortfall: number,
-        adjustedStatePension: number,
-        retirementIncome: number,
-        taxPayable: number,
-        totalIncome: number,
-        expenditure: number
-    ) {
+    function run_shortfall_calculation(shortfall: number, adjustedStatePension: number, retirementIncome: number) {
         // Need to withdraw from assets
-        let remainingWithdrawal = shortfall
+        let remainingShortfall = shortfall
         let taxableWithdrawals = 0
 
-        // Step 1: Withdraw from Cash first (taxable)
-        if (remainingWithdrawal > 0 && assetsByType.cash > 0) {
-            const cashWithdrawal = Math.min(remainingWithdrawal, assetsByType.cash)
-            assetsByType.cash -= cashWithdrawal
-            taxableWithdrawals += cashWithdrawal
-            remainingWithdrawal -= cashWithdrawal
-            console.log("withdraw cash", cashWithdrawal)
-        }
-
-        // Step 2: Withdraw from ISA (tax-free)
+        // Step 1: Withdraw from ISA (tax-free)
         // Try to minimize higher rate tax by using ISA intelligently
-        if (remainingWithdrawal > 0 && assetsByType.isa > 0) {
+        if (remainingShortfall > 0) {
             const currentTaxableIncome = adjustedStatePension + retirementIncome + taxableWithdrawals
             const roomBeforeHigherRate = Math.max(0, data.incomeTax.higherRateThreshold - currentTaxableIncome)
-
-            // If we're approaching higher rate threshold, use ISA for the excess
             const isaWithdrawal = Math.min(roomBeforeHigherRate, assetsByType.isa)
-            // if (roomBeforeHigherRate < remainingWithdrawal) {
-            //     // Would push into higher rate, so use ISA for the excess
-            //     isaWithdrawal = Math.min(remainingWithdrawal, assetsByType.isa)
-            // } else {
-            //     // Still in basic rate, withdraw a reasonable amount from ISA
-            //     isaWithdrawal = Math.min(remainingWithdrawal, assetsByType.isa)
-            // }
-
             assetsByType.isa -= isaWithdrawal
-            remainingWithdrawal -= isaWithdrawal
+            remainingShortfall -= isaWithdrawal
+        }
+
+        // remaining shortfall is now taxable income
+        const taxToPay = calculateIncomeTax(
+            remainingShortfall,
+            data.incomeTax.personalAllowance,
+            data.incomeTax.higherRateThreshold
+        )
+        // we need to find the shortfall and the tax (to keep the same take home pay)
+        remainingShortfall += taxToPay
+        const totalTaxableIncome = adjustedStatePension + retirementIncome + remainingShortfall
+
+        // Step 2: Withdraw from Cash first (taxable)
+        if (remainingShortfall > 0) {
+            const cashWithdrawal = Math.min(remainingShortfall, assetsByType.cash)
+            assetsByType.cash -= cashWithdrawal
+            taxableWithdrawals += cashWithdrawal
+            remainingShortfall -= cashWithdrawal
         }
 
         // Step 3: Withdraw from Pension (taxable)
-        if (remainingWithdrawal > 0 && assetsByType.pension > 0) {
-            const pensionWithdrawal = Math.min(remainingWithdrawal, assetsByType.pension)
+        if (remainingShortfall > 0) {
+            const pensionWithdrawal = Math.min(remainingShortfall, assetsByType.pension)
             assetsByType.pension -= pensionWithdrawal
             taxableWithdrawals += pensionWithdrawal
-            remainingWithdrawal -= pensionWithdrawal
+            remainingShortfall -= pensionWithdrawal
         }
 
         // Step 4: Sell Property last (taxable, less liquid)
-        if (remainingWithdrawal > 0 && assetsByType.property > 0) {
-            const propertyWithdrawal = Math.min(remainingWithdrawal, assetsByType.property)
+        if (remainingShortfall > 0) {
+            const propertyWithdrawal = Math.min(remainingShortfall, assetsByType.property)
             assetsByType.property -= propertyWithdrawal
             taxableWithdrawals += propertyWithdrawal
-            remainingWithdrawal -= propertyWithdrawal
+            remainingShortfall -= propertyWithdrawal
+        }
+
+        // Step 5: Withdraw remaining from ISA (forced)
+        if (remainingShortfall > 0) {
+            const isaWithdrawal = Math.min(remainingShortfall, assetsByType.isa)
+            assetsByType.isa -= isaWithdrawal
         }
 
         // Calculate tax on total taxable income (income + taxable withdrawals)
-        const totalTaxableIncome = adjustedStatePension + retirementIncome + taxableWithdrawals
-        taxPayable = calculateIncomeTax(
+        return calculateIncomeTax(
             totalTaxableIncome,
             data.incomeTax.personalAllowance,
             data.incomeTax.higherRateThreshold
         )
-
-        // Withdraw tax payment from assets.
-        // Preference: cash -> ISA -> pension -> property. This keeps behavior simple
-        // and satisfies tests that expect tax to reduce taxable accounts when cash is exhausted.
-        let remainingTax = taxPayable
-        if (remainingTax > 0) {
-            const fromCash = Math.min(assetsByType.cash, remainingTax)
-            assetsByType.cash -= fromCash
-            remainingTax -= fromCash
-        }
-
-        if (remainingTax > 0) {
-            const fromIsa = Math.min(assetsByType.isa, remainingTax)
-            assetsByType.isa -= fromIsa
-            remainingTax -= fromIsa
-        }
-
-        if (remainingTax > 0) {
-            const fromPension = Math.min(assetsByType.pension, remainingTax)
-            assetsByType.pension -= fromPension
-            remainingTax -= fromPension
-        }
-
-        if (remainingTax > 0) {
-            const fromProperty = Math.min(assetsByType.property, remainingTax)
-            assetsByType.property -= fromProperty
-            remainingTax -= fromProperty
-        }
 
         // Reinvest surplus after tax into ISA (tax-efficient)
         // const surplus = totalIncome - expenditure - taxPayable
         // if (surplus > 0) {
         //     assetsByType.isa += surplus
         // }
-        return taxPayable
+        // return taxPayable
     }
 
     for (let age = currentAge; age <= maxAge; age++) {
@@ -290,14 +259,7 @@ export function calculateProjection(data: RetirementData, maxYears: number = Inf
             const shortfall = expenditure - totalIncome
 
             if (shortfall > 0) {
-                taxPayable = run_shortfall_calculation(
-                    shortfall,
-                    adjustedStatePension,
-                    retirementIncome,
-                    taxPayable,
-                    totalIncome,
-                    expenditure
-                )
+                taxPayable = run_shortfall_calculation(shortfall, adjustedStatePension, retirementIncome)
             } else {
                 // Surplus income - calculate tax correctly on income surplus
                 // const totalTaxableIncome = adjustedStatePension + retirementIncome
@@ -360,8 +322,6 @@ export function calculateProjection(data: RetirementData, maxYears: number = Inf
         if (currentAssets <= 0 && !runsOutAt && age >= retirementAge) {
             runsOutAt = year
         }
-
-        console.log("summary at year=", year, age, currentAssets, assetsByType)
     }
 
     return {
