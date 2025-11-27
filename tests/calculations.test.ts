@@ -69,18 +69,18 @@ describe("calculateProjection", () => {
             assets: [{ id: "c", name: "Cash", value: 1000, category: AssetType.Cash }]
         })
         const result = calculateProjection(data)
-        expect(result).toBeNull()
+        expect(result.yearlyData).toHaveLength(0)
     })
 
     it("returns null when no assets provided", () => {
         const data = baseData({ assets: [] })
         const result = calculateProjection(data)
-        expect(result).toBeNull()
+        expect(result.yearlyData).toHaveLength(0)
     })
 
     it("adds state pension from age 67 (no inflation)", () => {
         const data = baseData()
-        const result = calculateProjection(data)!
+        const result = calculateProjection(data)
         const startAge = 60
         const arr = result.yearlyData
         const at66 = arr.find(y => y.age === 66)!
@@ -119,7 +119,7 @@ describe("calculateProjection", () => {
                 categoryGrowthRates: { Cash: 0, "Stocks & Shares": 0, Pensions: 0, Property: 0 }
             }
         })
-        const result = calculateProjection(data, 1)!
+        const result = calculateProjection(data, 1, "lowest_growth_first")
         const first = result.yearlyData[0]
         expect(first.taxPayable).toBe(0)
         // After withdrawing 5000: cash 0, isa 0 (2000 used), pension 1000, property 4000

@@ -13,14 +13,16 @@ import {
     AreaChart
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
-import type { RetirementData } from "@/types"
+import type { RetirementData, WithdrawalStrategy } from "@/types"
+import { useState } from "react"
 
 interface Props {
     data: RetirementData
 }
 
 export default function RetirementProjection({ data }: Props) {
-    const projection = calculateProjection(data)
+    const [strategy, setStrategy] = useState<WithdrawalStrategy>("tax_optimized")
+    const projection = calculateProjection(data, Infinity, strategy)
 
     if (!projection) {
         return (
@@ -31,6 +33,23 @@ export default function RetirementProjection({ data }: Props) {
     }
 
     const { yearlyData, runsOutAt, currentAssets } = projection
+    const birthYear = new Date(data.personal.dateOfBirth).getFullYear()
+
+    // Custom X-axis tick to render Year on first line and Age on second line
+    const YearAgeTick = ({ x, y, payload }: { x: number; y: number; payload: { value: number } }) => {
+        const year = payload.value
+        const age = year - birthYear
+        return (
+            <g transform={`translate(${x},${y})`}>
+                <text x={0} y={0} dy={0} textAnchor="middle" fill="#6b7280" fontSize={12}>
+                    {year}
+                </text>
+                <text x={0} y={0} dy={14} textAnchor="middle" fill="#9ca3af" fontSize={11}>
+                    Age {age}
+                </text>
+            </g>
+        )
+    }
 
     const getVariant = (): "success" | "warning" | "danger" => {
         if (!runsOutAt) return "success"
@@ -88,13 +107,48 @@ export default function RetirementProjection({ data }: Props) {
             )}
 
             <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                    Asset Projection by Type (Intelligent Drawdown)
-                </h3>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                    <h3 className="text-xl font-semibold text-gray-900">
+                        Asset Projection by Type
+                    </h3>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600">Withdrawal Strategy:</span>
+                        <div className="inline-flex rounded-md shadow-sm border border-gray-200 overflow-hidden" role="group">
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 text-sm ${
+                                    strategy === "tax_optimized"
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-white text-gray-700 hover:bg-gray-50"
+                                }`}
+                                onClick={() => setStrategy("tax_optimized")}
+                            >
+                                Minimise higher-rate tax
+                            </button>
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 text-sm border-l border-gray-200 ${
+                                    strategy === "lowest_growth_first"
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-white text-gray-700 hover:bg-gray-50"
+                                }`}
+                                onClick={() => setStrategy("lowest_growth_first")}
+                            >
+                                Lowest growth first
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={yearlyData}>
+                    <AreaChart data={yearlyData} margin={{ top: 10, right: 20, left: 0, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="year" stroke="#6b7280" tick={{ fill: "#6b7280" }} />
+                        <XAxis
+                            dataKey="year"
+                            stroke="#e5e7eb"
+                            tick={<YearAgeTick />}
+                            tickMargin={14}
+                            height={48}
+                        />
                         <YAxis
                             stroke="#6b7280"
                             tick={{ fill: "#6b7280" }}
@@ -161,8 +215,17 @@ export default function RetirementProjection({ data }: Props) {
                     </AreaChart>
                 </ResponsiveContainer>
                 <p className="text-sm text-gray-600 mt-4">
-                    <strong>Intelligent Drawdown:</strong> Cash withdrawn first → ISA used to avoid higher rate tax
-                    (40%) → Pension → Property (least liquid)
+                    {strategy === "tax_optimized" ? (
+                        <>
+                            <strong>Minimise higher-rate tax:</strong> Use ISA first up to the 40% threshold; then draw
+                            taxable income in order Cash → Pension → Property.
+                        </>
+                    ) : (
+                        <>
+                            <strong>Lowest growth first:</strong> Draw from the asset class with the lowest assumed
+                            growth rate first to preserve higher-growth assets.
+                        </>
+                    )}
                 </p>
             </div>
 

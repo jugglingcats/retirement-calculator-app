@@ -1,4 +1,4 @@
-import { AssetType, RetirementData } from "@/types"
+import { AssetType, RetirementData, WithdrawalStrategy } from "@/types"
 
 const UK_STATE_PENSION_2024 = 11502
 const STATE_PENSION_AGE = 67
@@ -22,13 +22,32 @@ function calculateIncomeTax(taxableIncome: number, personalAllowance: number, hi
     return basicRateAmount * 0.2 + higherRateAmount * 0.4
 }
 
-export function calculateProjection(data: RetirementData, maxYears: number = Infinity) {
+type YearlyDatapoint = {
+    year: number
+    age: number
+    assets: number
+    cash: number
+    isa: number
+    pension: number
+    property: number
+    income: number
+    expenditure: number
+    statePension: number
+    retirementIncome: number
+    taxPayable: number
+}
+
+export function calculateProjection(
+    data: RetirementData,
+    maxYears: number = Infinity,
+    strategy: WithdrawalStrategy = "balanced"
+): { yearlyData: YearlyDatapoint[]; runsOutAt: number; totalNeeded: number; currentAssets: number } {
     console.clear()
 
     console.log("Growth rates: ", data.assumptions.categoryGrowthRates)
 
     if (!data.personal.dateOfBirth || data.assets.length === 0) {
-        return null
+        return { yearlyData: [], runsOutAt: 0, currentAssets: 0, totalNeeded: 0 }
     }
 
     const currentYear = new Date().getFullYear()
@@ -41,22 +60,9 @@ export function calculateProjection(data: RetirementData, maxYears: number = Inf
         : null
 
     // Limit the projection to at most `maxYears` from the current age, with an absolute
-    // upper bound of age 120 to avoid runaway loops. Default is Infinity (effectively up to 120).
-    const maxAge = Math.min(currentAge + (isFinite(maxYears) ? Math.max(0, Math.floor(maxYears)) : Infinity), 120)
-    const yearlyData: Array<{
-        year: number
-        age: number
-        assets: number
-        cash: number
-        isa: number
-        pension: number
-        property: number
-        income: number
-        expenditure: number
-        statePension: number
-        retirementIncome: number
-        taxPayable: number
-    }> = []
+    // upper bound of age 100 to avoid runaway loops. Default is Infinity (effectively up to 100).
+    const maxAge = Math.min(currentAge + (isFinite(maxYears) ? Math.max(0, Math.floor(maxYears)) : Infinity), 100)
+    const yearlyData: YearlyDatapoint[] = []
 
     // Build a complete map of all asset types, summing values for categories that appear multiple times
     const assetsByType = Object.fromEntries(
@@ -69,7 +75,32 @@ export function calculateProjection(data: RetirementData, maxYears: number = Inf
         )
     )
 
-    let runsOutAt: number | null = null
+    let runsOutAt: number = 0
+
+    // Helper to map an AssetType to a growth category key used in assumptions
+    function getGrowthCategory(category: AssetType) {
+        switch (category) {
+            case AssetType.Pension:
+                return "pension"
+            case AssetType.Cash:
+                return "cash"
+            case AssetType.StocksAndShares:
+            case AssetType.ISA:
+                return "stocks"
+            case AssetType.Bonds:
+                return "bonds"
+            case AssetType.Property:
+                return "property"
+            default:
+                return "other"
+        }
+    }
+
+    function growthRateFor(type: AssetType): number {
+        const key = getGrowthCategory(type)
+        const pct = data.assumptions.categoryGrowthRates[key] || 0
+        return pct / 100
+    }
 
     /**
      * RUN SHORTFALL CALCULATION
@@ -79,62 +110,126 @@ export function calculateProjection(data: RetirementData, maxYears: number = Inf
         let remainingShortfall = shortfall
         let taxableWithdrawals = 0
 
-        // Step 1: Withdraw from ISA (tax-free)
-        // Try to minimize higher rate tax by using ISA intelligently
-        if (remainingShortfall > 0) {
-            const currentTaxableIncome = adjustedStatePension + retirementIncome + taxableWithdrawals
-            const roomBeforeHigherRate = Math.max(0, data.incomeTax.higherRateThreshold - currentTaxableIncome)
-            const isaWithdrawal = Math.min(roomBeforeHigherRate, assetsByType.isa)
-            assetsByType.isa -= isaWithdrawal
-            remainingShortfall -= isaWithdrawal
+        if (strategy === "tax_optimized") {
+            // Step 1: Withdraw from ISA (tax-free) up to higher-rate threshold buffer
+            if (remainingShortfall > 0) {
+                const currentTaxableIncome = adjustedStatePension + retirementIncome + taxableWithdrawals
+                const roomBeforeHigherRate = Math.max(0, data.incomeTax.higherRateThreshold - currentTaxableIncome)
+                const isaWithdrawal = Math.min(roomBeforeHigherRate, assetsByType.isa, remainingShortfall)
+                assetsByType.isa -= isaWithdrawal
+                remainingShortfall -= isaWithdrawal
+            }
+
+            // remaining shortfall is now taxable income
+            const taxToPay = calculateIncomeTax(
+                remainingShortfall,
+                data.incomeTax.personalAllowance,
+                data.incomeTax.higherRateThreshold
+            )
+            // we need to find the shortfall and the tax (to keep the same take home pay)
+            remainingShortfall += taxToPay
+            const totalTaxableIncome = adjustedStatePension + retirementIncome + remainingShortfall
+
+            // Step 2: Withdraw from Cash first (taxable)
+            if (remainingShortfall > 0) {
+                const cashWithdrawal = Math.min(remainingShortfall, assetsByType.cash)
+                assetsByType.cash -= cashWithdrawal
+                taxableWithdrawals += cashWithdrawal
+                remainingShortfall -= cashWithdrawal
+            }
+
+            // Step 3: Withdraw from Pension (taxable)
+            if (remainingShortfall > 0) {
+                const pensionWithdrawal = Math.min(remainingShortfall, assetsByType.pension)
+                assetsByType.pension -= pensionWithdrawal
+                // taxableWithdrawals += pensionWithdrawal
+                remainingShortfall -= pensionWithdrawal
+            }
+
+            // Step 4: Sell Property last (taxable, less liquid)
+            if (remainingShortfall > 0) {
+                const propertyWithdrawal = Math.min(remainingShortfall, assetsByType.property)
+                assetsByType.property -= propertyWithdrawal
+                // taxableWithdrawals += propertyWithdrawal
+                remainingShortfall -= propertyWithdrawal
+            }
+
+            // Step 5: Withdraw remaining from ISA (forced)
+            if (remainingShortfall > 0) {
+                const isaWithdrawal = Math.min(remainingShortfall, assetsByType.isa)
+                assetsByType.isa -= isaWithdrawal
+                // remainingShortfall -= isaWithdrawal
+            }
+
+            // Calculate tax on total taxable income (income + taxable withdrawals)
+            return calculateIncomeTax(
+                totalTaxableIncome,
+                data.incomeTax.personalAllowance,
+                data.incomeTax.higherRateThreshold
+            )
+        } else {
+            // lowest_growth_first
+            // Build ordered list of asset types present, ascending by expected growth
+            const order: AssetType[] = [
+                AssetType.Cash,
+                AssetType.Bonds,
+                AssetType.Property,
+                AssetType.Pension,
+                AssetType.ISA,
+                AssetType.StocksAndShares
+            ]
+                .filter(t => assetsByType[t as keyof typeof assetsByType] > 0)
+                .sort((a, b) => growthRateFor(a) - growthRateFor(b))
+
+            // Step 1: Use any leading tax-free assets in order (ISA) before introducing taxable income
+            for (const t of order) {
+                if (remainingShortfall <= 0) break
+                if (t === AssetType.ISA) {
+                    const amt = Math.min(remainingShortfall, assetsByType.isa)
+                    assetsByType.isa -= amt
+                    remainingShortfall -= amt
+                } else {
+                    // stop at first taxable asset; we'll compute tax once and then withdraw
+                    break
+                }
+            }
+
+            // Compute tax on remaining shortfall as taxable income
+            const taxToPay = calculateIncomeTax(
+                remainingShortfall,
+                data.incomeTax.personalAllowance,
+                data.incomeTax.higherRateThreshold
+            )
+            remainingShortfall += taxToPay
+            const totalTaxableIncome = adjustedStatePension + retirementIncome + remainingShortfall
+
+            // Step 2: Withdraw from taxable assets in lowest-growth order
+            for (const t of order) {
+                if (remainingShortfall <= 0) break
+                if (t === AssetType.ISA) continue // handled before/after
+                const key = t as keyof typeof assetsByType
+                const available = assetsByType[key]
+                if (available > 0) {
+                    const wd = Math.min(remainingShortfall, available)
+                    assetsByType[key] -= wd
+                    taxableWithdrawals += wd
+                    remainingShortfall -= wd
+                }
+            }
+
+            // Step 3: If anything remains, allow further ISA draw
+            if (remainingShortfall > 0) {
+                const isaWithdrawal = Math.min(remainingShortfall, assetsByType.isa)
+                assetsByType.isa -= isaWithdrawal
+                remainingShortfall -= isaWithdrawal
+            }
+
+            return calculateIncomeTax(
+                totalTaxableIncome,
+                data.incomeTax.personalAllowance,
+                data.incomeTax.higherRateThreshold
+            )
         }
-
-        // remaining shortfall is now taxable income
-        const taxToPay = calculateIncomeTax(
-            remainingShortfall,
-            data.incomeTax.personalAllowance,
-            data.incomeTax.higherRateThreshold
-        )
-        // we need to find the shortfall and the tax (to keep the same take home pay)
-        remainingShortfall += taxToPay
-        const totalTaxableIncome = adjustedStatePension + retirementIncome + remainingShortfall
-
-        // Step 2: Withdraw from Cash first (taxable)
-        if (remainingShortfall > 0) {
-            const cashWithdrawal = Math.min(remainingShortfall, assetsByType.cash)
-            assetsByType.cash -= cashWithdrawal
-            taxableWithdrawals += cashWithdrawal
-            remainingShortfall -= cashWithdrawal
-        }
-
-        // Step 3: Withdraw from Pension (taxable)
-        if (remainingShortfall > 0) {
-            const pensionWithdrawal = Math.min(remainingShortfall, assetsByType.pension)
-            assetsByType.pension -= pensionWithdrawal
-            taxableWithdrawals += pensionWithdrawal
-            remainingShortfall -= pensionWithdrawal
-        }
-
-        // Step 4: Sell Property last (taxable, less liquid)
-        if (remainingShortfall > 0) {
-            const propertyWithdrawal = Math.min(remainingShortfall, assetsByType.property)
-            assetsByType.property -= propertyWithdrawal
-            taxableWithdrawals += propertyWithdrawal
-            remainingShortfall -= propertyWithdrawal
-        }
-
-        // Step 5: Withdraw remaining from ISA (forced)
-        if (remainingShortfall > 0) {
-            const isaWithdrawal = Math.min(remainingShortfall, assetsByType.isa)
-            assetsByType.isa -= isaWithdrawal
-        }
-
-        // Calculate tax on total taxable income (income + taxable withdrawals)
-        return calculateIncomeTax(
-            totalTaxableIncome,
-            data.incomeTax.personalAllowance,
-            data.incomeTax.higherRateThreshold
-        )
 
         // Reinvest surplus after tax into ISA (tax-efficient)
         // const surplus = totalIncome - expenditure - taxPayable
@@ -149,27 +244,7 @@ export function calculateProjection(data: RetirementData, maxYears: number = Inf
         const yearsFromNow = year - currentYear
 
         Object.keys(assetsByType).forEach(type => {
-            function getGrowthCategory(category: AssetType) {
-                switch (category) {
-                    case AssetType.Pension:
-                        return "pension"
-                    case AssetType.Cash:
-                        return "cash"
-                    case AssetType.StocksAndShares:
-                    case AssetType.ISA:
-                        return "stocks"
-                    case AssetType.Bonds:
-                        return "bonds"
-                    case AssetType.Property:
-                        return "property"
-                    default:
-                        return "other"
-                }
-            }
-
-            const growth_category = getGrowthCategory(type as AssetType)
-            const category_growth_rate_percent = data.assumptions.categoryGrowthRates[growth_category] || 0
-            const growth_rate = category_growth_rate_percent / 100
+            const growth_rate = growthRateFor(type as AssetType)
             assetsByType[type as AssetType] *= 1 + growth_rate
         })
 
