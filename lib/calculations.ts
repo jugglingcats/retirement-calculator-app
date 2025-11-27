@@ -1,4 +1,5 @@
-import { AssetType, RetirementData, WithdrawalStrategy } from "@/types"
+import { AssetType, RetirementData, DrawdownStrategy } from "@/types"
+import { performDrawdown, AssetBalances } from "@/lib/drawdown"
 
 const UK_STATE_PENSION_2024 = 11502
 const STATE_PENSION_AGE = 67
@@ -40,7 +41,7 @@ type YearlyDatapoint = {
 export function calculateProjection(
     data: RetirementData,
     maxYears: number = Infinity,
-    strategy: WithdrawalStrategy = "balanced"
+    strategy: DrawdownStrategy = "balanced"
 ): { yearlyData: YearlyDatapoint[]; runsOutAt: number; totalNeeded: number; currentAssets: number } {
     console.clear()
 
@@ -168,61 +169,28 @@ export function calculateProjection(
                 data.incomeTax.higherRateThreshold
             )
         } else {
-            // lowest_growth_first
-            // Build ordered list of asset types present, ascending by expected growth
-            const order: AssetType[] = [
-                AssetType.Cash,
-                AssetType.Bonds,
-                AssetType.Property,
-                AssetType.Pension,
-                AssetType.ISA,
-                AssetType.StocksAndShares
-            ]
-                .filter(t => assetsByType[t as keyof typeof assetsByType] > 0)
-                .sort((a, b) => growthRateFor(a) - growthRateFor(b))
+            // "balanced" or "lowest_growth_first" strategies use the drawdown module
+            // Build growth rates record for each asset type
+            const growthRates = Object.fromEntries(
+                Object.values(AssetType).map(type => [type, growthRateFor(type)])
+            ) as Record<AssetType, number>
 
-            // Step 1: Use any leading tax-free assets in order (ISA) before introducing taxable income
-            for (const t of order) {
-                if (remainingShortfall <= 0) break
-                if (t === AssetType.ISA) {
-                    const amt = Math.min(remainingShortfall, assetsByType.isa)
-                    assetsByType.isa -= amt
-                    remainingShortfall -= amt
-                } else {
-                    // stop at first taxable asset; we'll compute tax once and then withdraw
-                    break
-                }
-            }
-
-            // Compute tax on remaining shortfall as taxable income
+            // Compute tax on shortfall as taxable income
             const taxToPay = calculateIncomeTax(
                 remainingShortfall,
                 data.incomeTax.personalAllowance,
                 data.incomeTax.higherRateThreshold
             )
-            remainingShortfall += taxToPay
-            const totalTaxableIncome = adjustedStatePension + retirementIncome + remainingShortfall
+            const totalNeeded = remainingShortfall + taxToPay
+            const totalTaxableIncome = adjustedStatePension + retirementIncome + totalNeeded
 
-            // Step 2: Withdraw from taxable assets in lowest-growth order
-            for (const t of order) {
-                if (remainingShortfall <= 0) break
-                if (t === AssetType.ISA) continue // handled before/after
-                const key = t as keyof typeof assetsByType
-                const available = assetsByType[key]
-                if (available > 0) {
-                    const wd = Math.min(remainingShortfall, available)
-                    assetsByType[key] -= wd
-                    taxableWithdrawals += wd
-                    remainingShortfall -= wd
-                }
-            }
-
-            // Step 3: If anything remains, allow further ISA draw
-            if (remainingShortfall > 0) {
-                const isaWithdrawal = Math.min(remainingShortfall, assetsByType.isa)
-                assetsByType.isa -= isaWithdrawal
-                remainingShortfall -= isaWithdrawal
-            }
+            // Perform the drawdown using the selected strategy
+            performDrawdown(
+                assetsByType as AssetBalances,
+                totalNeeded,
+                growthRates,
+                strategy as "balanced" | "lowest_growth_first"
+            )
 
             return calculateIncomeTax(
                 totalTaxableIncome,

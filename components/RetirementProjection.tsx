@@ -13,7 +13,7 @@ import {
     AreaChart
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
-import type { RetirementData, WithdrawalStrategy } from "@/types"
+import type { RetirementData, DrawdownStrategy } from "@/types"
 import { useState } from "react"
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function RetirementProjection({ data }: Props) {
-    const [strategy, setStrategy] = useState<WithdrawalStrategy>("tax_optimized")
+    const [strategy, setStrategy] = useState<DrawdownStrategy>("balanced")
     const projection = calculateProjection(data, Infinity, strategy)
 
     if (!projection) {
@@ -108,22 +108,23 @@ export default function RetirementProjection({ data }: Props) {
 
             <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                        Asset Projection by Type
-                    </h3>
+                    <h3 className="text-xl font-semibold text-gray-900">Asset Projection by Type</h3>
                     <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600">Withdrawal Strategy:</span>
-                        <div className="inline-flex rounded-md shadow-sm border border-gray-200 overflow-hidden" role="group">
+                        <span className="text-sm text-gray-600">Drawdown Strategy:</span>
+                        <div
+                            className="inline-flex rounded-md shadow-sm border border-gray-200 overflow-hidden"
+                            role="group"
+                        >
                             <button
                                 type="button"
                                 className={`px-3 py-1.5 text-sm ${
-                                    strategy === "tax_optimized"
+                                    strategy === "balanced"
                                         ? "bg-indigo-600 text-white"
                                         : "bg-white text-gray-700 hover:bg-gray-50"
                                 }`}
-                                onClick={() => setStrategy("tax_optimized")}
+                                onClick={() => setStrategy("balanced")}
                             >
-                                Minimise higher-rate tax
+                                Balanced
                             </button>
                             <button
                                 type="button"
@@ -140,12 +141,14 @@ export default function RetirementProjection({ data }: Props) {
                     </div>
                 </div>
                 <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={yearlyData} margin={{ top: 10, right: 20, left: 0, bottom: 30 }}>
+                    <AreaChart data={yearlyData} margin={{ top: 10, right: 20, left: 10, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
                             dataKey="year"
                             stroke="#e5e7eb"
-                            tick={<YearAgeTick />}
+                            tick={(props: { x: number; y: number; payload: { value: number } }) => (
+                                <YearAgeTick {...props} />
+                            )}
                             tickMargin={14}
                             height={48}
                         />
@@ -187,9 +190,18 @@ export default function RetirementProjection({ data }: Props) {
                             contentStyle={{ background: "white", border: "2px solid #e5e7eb", borderRadius: "8px" }}
                         />
                         <Legend />
-                        <Area type="monotone" dataKey="cash" stackId="1" stroke="#10b981" fill="#10b981" name="Cash" />
                         <Area
-                            type="monotone"
+                            type="step"
+                            alignmentBaseline="before-edge"
+                            dataKey="cash"
+                            stackId="1"
+                            stroke="#10b981"
+                            fill="#10b981"
+                            name="Cash"
+                        />
+                        <Area
+                            type="step"
+                            alignmentBaseline="before-edge"
                             dataKey="isa"
                             stackId="1"
                             stroke="#6366f1"
@@ -197,7 +209,8 @@ export default function RetirementProjection({ data }: Props) {
                             name="ISA (Tax-Free)"
                         />
                         <Area
-                            type="monotone"
+                            type="step"
+                            alignmentBaseline="before-edge"
                             dataKey="pension"
                             stackId="1"
                             stroke="#8b5cf6"
@@ -205,7 +218,8 @@ export default function RetirementProjection({ data }: Props) {
                             name="Pension"
                         />
                         <Area
-                            type="monotone"
+                            type="step"
+                            alignmentBaseline="before-edge"
                             dataKey="property"
                             stackId="1"
                             stroke="#f59e0b"
@@ -232,7 +246,7 @@ export default function RetirementProjection({ data }: Props) {
             <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Annual Income vs Expenditure</h3>
                 <ResponsiveContainer width="100%" height={400}>
-                    <LineChart data={yearlyData}>
+                    <LineChart data={yearlyData} margin={{ top: 10, right: 20, left: 60, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis dataKey="year" stroke="#6b7280" tick={{ fill: "#6b7280" }} />
                         <YAxis

@@ -75,7 +75,7 @@ export interface RetirementData {
 }
 
 // Strategy for funding shortfalls during retirement projections
-export type WithdrawalStrategy =
+export type DrawdownStrategy =
     | "tax_optimized" // Use ISA to avoid higher-rate band, then taxable in fixed order
     | "lowest_growth_first" // Draw from the lowest expected growth asset first
     | "balanced" // Spread withdrawals evenly across all assets
