@@ -8,6 +8,7 @@ export interface PersonalInfo {
 
 export enum AssetType {
     Pension = "pension",
+    PensionCrystallised = "pensionCrystallised",
     Cash = "cash",
     StocksAndShares = "stocks",
     ISA = "isa",
@@ -33,6 +34,7 @@ export interface IncomeNeed {
 export interface Assumptions {
     inflationRate: number
     categoryGrowthRates: Record<string, number>
+    bedAndISAEnabled?: boolean
 }
 
 export interface MarketShock {

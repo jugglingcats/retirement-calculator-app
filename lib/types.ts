@@ -21,6 +21,7 @@ export type YearlyDatapoint = {
     stocks: number
     isa: number
     pension: number
+    pensionCrystallised: number
     property: number
     income: number
     expenditure: number
@@ -39,4 +40,8 @@ export type TaxPosition = {
     personalAllowanceRemaining: number
     basicRateRemaining: number
     tax: number
+}
+export enum AssetPoolType {
+    PRIMARY = 0,
+    SPOUSE = 1
 }

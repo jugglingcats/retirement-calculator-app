@@ -19,9 +19,10 @@ import { useMemo, useState } from "react"
 
 interface Props {
     data: RetirementData
+    setData: (data: RetirementData) => void
 }
 
-export default function RetirementProjection({ data }: Props) {
+export default function RetirementProjection({ data, setData }: Props) {
     const [strategy, setStrategy] = useState<DrawdownStrategy>("balanced")
 
     if (!data.personal.dateOfBirth || data.assets.length === 0) {
@@ -30,6 +31,16 @@ export default function RetirementProjection({ data }: Props) {
                 Please complete the Personal Info, Assets, and Income Needs sections to see your retirement projection.
             </div>
         )
+    }
+
+    const updateBedAndISA = (enabled: boolean) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                bedAndISAEnabled: enabled
+            }
+        })
     }
 
     // Precompute projections for all strategies so the Y-axis can use a fixed scale
@@ -86,6 +97,68 @@ export default function RetirementProjection({ data }: Props) {
         danger: "from-red-500 to-red-600"
     }
 
+    // Format currency to 5 significant figures with thousand separators
+    const formatGBP = (value: number, sig = 5) => {
+        if (!isFinite(value) || value === 0) return "£0"
+        const sign = value < 0 ? "-" : ""
+        const abs = Math.abs(value)
+        const digits = Math.floor(Math.log10(abs)) + 1
+        const scalePow = Math.max(0, digits - sig)
+        const scale = Math.pow(10, scalePow)
+        const rounded = Math.round(abs / scale) * scale
+        return `£${sign}${Math.trunc(rounded).toLocaleString()}`
+    }
+
+    // Custom tooltip for the Asset Projection chart so we can include Total assets
+    const AssetTooltip = ({ active, payload, label }: any) => {
+        if (!active || !payload || payload.length === 0) return null
+        const year: number = label
+        const idx = yearlyData.findIndex(d => d.year === year)
+        const prev = idx > 0 ? (yearlyData[idx - 1] as any) : null
+        const curr = yearlyData[idx] as any
+
+        const total = Number(curr?.assets || 0)
+        const totalPrev = Number(prev?.assets || 0)
+        const totalDelta = total - totalPrev
+        const totalArrow = totalDelta > 0 ? "▲" : totalDelta < 0 ? "▼" : "•"
+        const totalSign = totalDelta > 0 ? "+" : totalDelta < 0 ? "-" : ""
+        const totalAbs = Math.abs(totalDelta)
+
+        return (
+            <div style={{ background: "white", border: "2px solid #e5e7eb", borderRadius: 8, padding: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Year {year}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {payload.map((item: any) => {
+                        const key = item?.dataKey as string
+                        const name = item?.name as string
+                        const color = item?.color as string
+                        const currVal = Number(curr?.[key] || 0)
+                        const prevVal = Number(prev?.[key] || 0)
+                        const delta = currVal - prevVal
+                        const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "•"
+                        const sign = delta > 0 ? "+" : delta < 0 ? "-" : ""
+                        const absDelta = Math.abs(delta)
+                        return (
+                            <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ width: 10, height: 10, background: color, borderRadius: 2, display: "inline-block" }} />
+                                <span style={{ color: "#374151" }}>{name}</span>
+                                <span style={{ marginLeft: "auto", color: "#111827" }}>
+                                    {formatGBP(currVal)} <span style={{ color: "#6b7280" }}>({arrow} {sign}{formatGBP(absDelta)})</span>
+                                </span>
+                            </div>
+                        )
+                    })}
+                </div>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #e5e7eb", display: "flex", gap: 8 }}>
+                    <strong style={{ color: "#111827" }}>Total assets</strong>
+                    <span style={{ marginLeft: "auto", color: "#111827" }}>
+                        {formatGBP(total)} <span style={{ color: "#6b7280" }}>({totalArrow} {totalSign}{formatGBP(totalAbs)})</span>
+                    </span>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="flex flex-col gap-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -130,7 +203,19 @@ export default function RetirementProjection({ data }: Props) {
             <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                     <h3 className="text-xl font-semibold text-gray-900">Asset Projection by Type</h3>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="bedAndISAProjection"
+                                checked={data.assumptions.bedAndISAEnabled || false}
+                                onChange={e => updateBedAndISA(e.target.checked)}
+                                className="w-5 h-5 text-indigo-600 border-2 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <label htmlFor="bedAndISAProjection" className="text-sm text-gray-700">
+                                Bed and ISA
+                            </label>
+                        </div>
                         <span className="text-sm text-gray-600">Drawdown Strategy:</span>
                         <div
                             className="inline-flex rounded-md shadow-sm border border-gray-200 overflow-hidden"
@@ -177,6 +262,13 @@ export default function RetirementProjection({ data }: Props) {
                 </div>
                 <ResponsiveContainer width="100%" height={400}>
                     <AreaChart data={yearlyData} margin={{ top: 10, right: 20, left: 10, bottom: 30 }}>
+                        <defs>
+                            {/* Hatch pattern for crystallised pension - same colour as pension but hatched */}
+                            <pattern id="pensionHatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+                                <rect width="6" height="6" fill="#a855f7" opacity="0.15" />
+                                <line x1="0" y1="0" x2="0" y2="6" stroke="#a855f7" strokeWidth="2" opacity="0.6" />
+                            </pattern>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
                             dataKey="year"
@@ -193,38 +285,7 @@ export default function RetirementProjection({ data }: Props) {
                             tickFormatter={value => `£${(value / 1000).toFixed(0)}k`}
                             domain={[0, fixedYAxisMax]}
                         />
-                        <Tooltip
-                            labelFormatter={(label: any) => `Year ${label}`}
-                            formatter={(value: number, name: string, item: any) => {
-                                try {
-                                    const dataKey: string | undefined = item?.dataKey
-                                    const year: number | undefined = item?.payload?.year
-                                    if (!dataKey || typeof year !== "number") {
-                                        return [`£${Number(value || 0).toLocaleString()}`, name]
-                                    }
-
-                                    // Find current and previous data points by year
-                                    // yearlyData is in closure scope
-                                    const idx = yearlyData.findIndex(d => d.year === year)
-                                    const prev = idx > 0 ? (yearlyData[idx - 1] as any) : null
-                                    const curr = yearlyData[idx] as any
-                                    const currVal = Number(curr?.[dataKey] || 0)
-                                    const prevVal = Number(prev?.[dataKey] || 0)
-                                    const delta = currVal - prevVal
-
-                                    const sign = delta > 0 ? "+" : delta < 0 ? "-" : ""
-                                    const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "•"
-                                    const absDelta = Math.abs(delta)
-
-                                    const valueText = `£${currVal.toLocaleString()}  (${arrow} ${sign}£${absDelta.toLocaleString()})`
-                                    // Keep the asset type name visible as the second element
-                                    return [valueText, name]
-                                } catch {
-                                    return [`£${Number(value || 0).toLocaleString()}`, name]
-                                }
-                            }}
-                            contentStyle={{ background: "white", border: "2px solid #e5e7eb", borderRadius: "8px" }}
-                        />
+                        <Tooltip content={<AssetTooltip />} />
                         <Legend />
                         <Area
                             type="step"
@@ -252,6 +313,15 @@ export default function RetirementProjection({ data }: Props) {
                             stroke="#1d4ed8"
                             fill="#1d4ed8"
                             name="ISAs"
+                        />
+                        <Area
+                            type="step"
+                            alignmentBaseline="before-edge"
+                            dataKey="pensionCrystallised"
+                            stackId="1"
+                            stroke="#a855f7"
+                            fill="url(#pensionHatch)"
+                            name="Pension (crystallised)"
                         />
                         <Area
                             type="step"
@@ -315,7 +385,7 @@ export default function RetirementProjection({ data }: Props) {
                         <Tooltip
                             labelFormatter={(label: any) => `Year ${label}`}
                             formatter={(value: number, name: string) => [
-                                `£${Number(value || 0).toLocaleString()}`,
+                                formatGBP(Number(value || 0)),
                                 name || ""
                             ]}
                             contentStyle={{ background: "white", border: "2px solid #e5e7eb", borderRadius: "8px" }}

@@ -1,8 +1,12 @@
-import { AssetType, DrawdownStrategy, MarketShock, OneOff, RetirementData, RetirementIncome } from "@/types"
-import { assetTypes, getGrowthCategory, growthRateFor, isTaxable, sumAssets, sumNumbers } from "@/lib/utils"
-import { AssetPool, ProjectionResult, YearlyDatapoint } from "@/lib/types"
+import { AssetType, DrawdownStrategy, RetirementData, RetirementIncome } from "@/types"
+import { assetTypes, growthRateFor, isTaxable, sumAssets, sumNumbers } from "@/lib/utils"
+import { AssetPool, AssetPoolType, ProjectionResult, YearlyDatapoint } from "@/lib/types"
 import { initialTaxPosition, updateTaxPosition } from "@/lib/tax"
 import { createDrawdownStrategy } from "@/lib/strategies"
+import { applyBedAndISA } from "@/lib/annual/bedAndIsa"
+import { applyOneOffs } from "@/lib/annual/oneOffs"
+import { applyMarketShock } from "@/lib/annual/marketShock"
+import { applyGrowth } from "@/lib/annual/growth"
 
 const UK_STATE_PENSION_2024 = 11502
 const STATE_PENSION_AGE = 67
@@ -35,28 +39,6 @@ function buildAssetPools(assets: RetirementData["assets"]): [AssetPool, AssetPoo
     }
 
     return [primary, spouse]
-}
-
-function applyGrowth(assetPools: AssetPool[], categoryGrowthRates: Record<string, number>): void {
-    for (const assets of assetPools) {
-        for (const type of Object.values(AssetType)) {
-            const growthRate = growthRateFor(categoryGrowthRates, type)
-            assets[type] *= 1 + growthRate
-        }
-    }
-}
-
-function applyMarketShock(assetPools: AssetPool[], shock?: MarketShock): void {
-    if (!shock) {
-        return
-    }
-    for (const assets of assetPools) {
-        for (const type of Object.values(AssetType)) {
-            if (getGrowthCategory(type) === "stocks") {
-                assets[type] *= (100 + shock.impactPercent) / 100
-            }
-        }
-    }
 }
 
 function buildStatePensions(age: number, spouseAge: number, inflationMultiplier: number): number[] {
@@ -101,31 +83,6 @@ function combineAssets(pools: AssetPool[]): AssetPool {
     return combined
 }
 
-enum AssetPoolType {
-    PRIMARY = 0,
-    SPOUSE = 1
-}
-
-function applyOneOffs(
-    assetPools: [AssetPool, AssetPool],
-    oneOffs: OneOff[],
-    ages: number[],
-    inflationMultiplier: number
-) {
-    const [age, spouseAge] = ages
-    oneOffs?.forEach(oneOff => {
-        if (!oneOff.enabled) {
-            return
-        }
-        const adjustedAmount = oneOff.amount * inflationMultiplier
-        if (oneOff.belongsToSpouse && spouseAge === oneOff.age) {
-            assetPools[AssetPoolType.SPOUSE].cash += adjustedAmount
-        } else if (age === oneOff.age) {
-            assetPools[AssetPoolType.PRIMARY].cash += adjustedAmount
-        }
-    })
-}
-
 export function calculateProjection(
     data: RetirementData,
     maxYears: number = Infinity,
@@ -158,6 +115,11 @@ export function calculateProjection(
         const inflationMultiplier = Math.pow(1 + assumptions.inflationRate / 100, yearsFromNow)
         const spouseAge = year - (spouseBirthYear || Number.NaN)
         const ages = [age, spouseAge]
+
+        // Bed and ISA process runs at the start of each year for eligible individuals (age 55+)
+        if (assumptions.bedAndISAEnabled) {
+            applyBedAndISA(assetPools, ages)
+        }
 
         applyGrowth(assetPools, assumptions.categoryGrowthRates)
         applyOneOffs(assetPools, oneOffs, ages, inflationMultiplier)
@@ -245,6 +207,7 @@ export function calculateProjection(
             stocks: Math.max(0, combinedAssets.stocks),
             isa: Math.max(0, combinedAssets.isa),
             pension: Math.max(0, combinedAssets.pension),
+            pensionCrystallised: Math.max(0, combinedAssets.pensionCrystallised),
             property: Math.max(0, combinedAssets.property),
             income: baseTaxableIncome,
             expenditure: expenditure,

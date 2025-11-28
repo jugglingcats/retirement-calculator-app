@@ -67,6 +67,7 @@ export function performTaxOptimizedDrawdown(
 function createAssets(overrides: Partial<AssetPool> = {}): AssetPool {
     return {
         [AssetType.Pension]: 0,
+        [AssetType.PensionCrystallised]: 0,
         [AssetType.Cash]: 0,
         [AssetType.StocksAndShares]: 0,
         [AssetType.ISA]: 0,
@@ -79,6 +80,7 @@ function createAssets(overrides: Partial<AssetPool> = {}): AssetPool {
 function createGrowthRates(overrides: Partial<Record<AssetType, number>> = {}): Record<AssetType, number> {
     return {
         [AssetType.Pension]: 0.05,
+        [AssetType.PensionCrystallised]: 0.05,
         [AssetType.Cash]: 0.01,
         [AssetType.StocksAndShares]: 0.07,
         [AssetType.ISA]: 0.06,

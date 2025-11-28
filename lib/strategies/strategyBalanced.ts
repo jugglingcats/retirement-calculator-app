@@ -32,6 +32,7 @@ export class BalancedStrategy extends BaseDrawdownStrategy {
         const withdrawals: Record<AssetType, number> = {
             [AssetType.Cash]: 0,
             [AssetType.Pension]: 0,
+            [AssetType.PensionCrystallised]: 0,
             [AssetType.StocksAndShares]: 0,
             [AssetType.ISA]: 0,
             [AssetType.Bonds]: 0,

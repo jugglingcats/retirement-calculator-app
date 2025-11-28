@@ -11,6 +11,7 @@ export function cn(...inputs: ClassValue[]) {
 export function getGrowthCategory(category: AssetType) {
     switch (category) {
         case AssetType.Pension:
+        case AssetType.PensionCrystallised:
             return "pension"
         case AssetType.Cash:
             return "cash"
@@ -29,6 +30,7 @@ export function getGrowthCategory(category: AssetType) {
 export function isTaxable(category: AssetType): boolean {
     switch (category) {
         case AssetType.Pension:
+        case AssetType.PensionCrystallised:
             return true
         case AssetType.Cash:
             return false

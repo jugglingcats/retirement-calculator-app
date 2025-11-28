@@ -33,6 +33,16 @@ export default function AssumptionsForm({ data, setData }: Props) {
         })
     }
 
+    const updateBedAndISA = (enabled: boolean) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                bedAndISAEnabled: enabled
+            }
+        })
+    }
+
     return (
         <div className="flex flex-col gap-8 max-w-4xl">
             <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
@@ -72,6 +82,26 @@ export default function AssumptionsForm({ data, setData }: Props) {
                         </div>
                     ))}
                 </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Bed and ISA</h3>
+                <div className="flex items-center gap-3">
+                    <input
+                        type="checkbox"
+                        id="bedAndISA"
+                        checked={data.assumptions.bedAndISAEnabled || false}
+                        onChange={e => updateBedAndISA(e.target.checked)}
+                        className="w-5 h-5 text-indigo-600 border-2 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="bedAndISA" className="font-semibold text-gray-700">
+                        Enable Bed and ISA
+                    </label>
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                    When enabled, the projection will simulate the Bed and ISA process from age 55. Each year, up to
+                    £20,000 per person is transferred tax-free from pension to ISA (25% of £80,000 crystallised).
+                </p>
             </div>
 
             <div className="p-6 bg-blue-50 rounded-lg border-2 border-blue-200">
