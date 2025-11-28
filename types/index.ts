@@ -1,3 +1,5 @@
+import { TaxSettings } from "@/lib/types"
+
 export interface PersonalInfo {
     dateOfBirth: string
     spouseDateOfBirth: string
@@ -31,11 +33,6 @@ export interface IncomeNeed {
 export interface Assumptions {
     inflationRate: number
     categoryGrowthRates: Record<string, number>
-}
-
-export interface IncomeTax {
-    personalAllowance: number
-    higherRateThreshold: number
 }
 
 export interface MarketShock {
@@ -72,7 +69,7 @@ export interface RetirementData {
     incomeNeeds: IncomeNeed[]
     retirementIncome: RetirementIncome[]
     assumptions: Assumptions
-    incomeTax: IncomeTax // Added income tax settings
+    incomeTax: TaxSettings // Added income tax settings
     shocks: MarketShock[]
     oneOffs: OneOff[]
 }

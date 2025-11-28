@@ -1,6 +1,6 @@
 import { AssetType } from "@/types"
 
-export type AssetBalances = Record<AssetType, number>
+export type AssetPool = Record<AssetType, number>
 export type DrawdownStrategyType = "balanced" | "lowest_growth_first" | "tax_optimized"
 
 export interface TaxSettings {
@@ -24,6 +24,7 @@ export interface AssetDrawdownResult {
     remaining: number
     taxableWithdrawn: number
 }
+
 export type YearlyDatapoint = {
     year: number
     age: number
@@ -44,4 +45,9 @@ export type ProjectionResult = {
     runsOutAt: number
     totalNeeded: number
     currentAssets: number
+}
+export type TaxPosition = {
+    personalAllowanceRemaining: number
+    basicRateRemaining: number
+    tax: number
 }

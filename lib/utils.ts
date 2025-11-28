@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { AssetType, Assumptions } from "@/types"
+import { AssetPool } from "@/lib/types"
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
@@ -48,27 +49,13 @@ export function growthRateFor(categoryGrowthRates: Assumptions["categoryGrowthRa
     const pct = categoryGrowthRates[key] || 0
     return pct / 100
 }
-/**
- * Calculates income tax based on UK tax bands.
- */
-export function calculateIncomeTax(
-    taxableIncome: number,
-    personalAllowance: number,
-    higherRateThreshold: number
-): number {
-    if (taxableIncome <= personalAllowance) {
-        return 0
-    }
 
-    const taxableAboveAllowance = taxableIncome - personalAllowance
-    const basicRateBand = higherRateThreshold - personalAllowance
+export const assetTypes = Object.values(AssetType)
 
-    if (taxableAboveAllowance <= basicRateBand) {
-        return taxableAboveAllowance * 0.2
-    }
+export function sumAssets(assets: AssetPool): number {
+    return assetTypes.reduce((sum, type) => sum + assets[type], 0)
+}
 
-    const basicRateTax = basicRateBand * 0.2
-    const higherRateTax = (taxableAboveAllowance - basicRateBand) * 0.4
-
-    return basicRateTax + higherRateTax
+export function sumNumbers(numbers: number[]) {
+    return numbers.reduce((sum, n) => sum + n, 0)
 }

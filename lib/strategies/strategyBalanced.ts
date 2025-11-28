@@ -1,5 +1,5 @@
 import { BaseDrawdownStrategy } from "@/lib/strategies/base"
-import { AssetBalances, AssetDrawdownResult } from "@/lib/types"
+import { AssetPool, AssetDrawdownResult } from "@/lib/types"
 import { AssetType } from "@/types"
 import { isTaxable } from "@/lib/utils"
 
@@ -7,7 +7,7 @@ import { isTaxable } from "@/lib/utils"
  * Balanced strategy - draws proportionally from all asset types.
  */
 export class BalancedStrategy extends BaseDrawdownStrategy {
-    public withdrawFromAssets(assets: AssetBalances, amount: number): AssetDrawdownResult {
+    public withdrawFromAssets(assets: AssetPool, amount: number): AssetDrawdownResult {
         if (amount <= 0) {
             return {
                 remaining: 0,

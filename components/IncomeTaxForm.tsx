@@ -1,6 +1,7 @@
 "use client"
 
-import type { RetirementData, IncomeTax } from "@/types"
+import type { RetirementData } from "@/types"
+import { TaxSettings } from "@/lib/types"
 
 interface Props {
     data: RetirementData
@@ -8,7 +9,7 @@ interface Props {
 }
 
 export default function IncomeTaxForm({ data, setData }: Props) {
-    const updateIncomeTax = (updates: Partial<IncomeTax>) => {
+    const updateIncomeTax = (updates: Partial<TaxSettings>) => {
         setData({
             ...data,
             incomeTax: {

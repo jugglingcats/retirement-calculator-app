@@ -1,7 +1,8 @@
-import { AssetType, DrawdownStrategy, RetirementData } from "@/types"
-import { getGrowthCategory, growthRateFor } from "@/lib/utils"
-import { run_shortfall_calculation_split } from "@/lib/shortfall"
-import { AssetBalances, ProjectionResult, YearlyDatapoint } from "@/lib/types"
+import { AssetType, DrawdownStrategy, MarketShock, OneOff, RetirementData, RetirementIncome } from "@/types"
+import { assetTypes, getGrowthCategory, growthRateFor, isTaxable, sumAssets, sumNumbers } from "@/lib/utils"
+import { AssetPool, ProjectionResult, YearlyDatapoint } from "@/lib/types"
+import { initialTaxPosition, updateTaxPosition } from "@/lib/tax"
+import { createDrawdownStrategy } from "@/lib/strategies"
 
 const UK_STATE_PENSION_2024 = 11502
 const STATE_PENSION_AGE = 67
@@ -17,11 +18,11 @@ function getNetExpenditure(incomeNeeds: RetirementData["incomeNeeds"], retiremen
     return sortedNeeds.find(need => age >= need.effectiveStartingAge)
 }
 
-function createEmptyAssetBalances(): AssetBalances {
-    return Object.fromEntries(Object.values(AssetType).map(type => [type, 0])) as AssetBalances
+function createEmptyAssetBalances(): AssetPool {
+    return Object.fromEntries(Object.values(AssetType).map(type => [type, 0])) as AssetPool
 }
 
-function buildAssetsByOwner(assets: RetirementData["assets"]): { primary: AssetBalances; spouse: AssetBalances } {
+function buildAssetPools(assets: RetirementData["assets"]): [AssetPool, AssetPool] {
     const primary = createEmptyAssetBalances()
     const spouse = createEmptyAssetBalances()
 
@@ -33,34 +34,96 @@ function buildAssetsByOwner(assets: RetirementData["assets"]): { primary: AssetB
         }
     }
 
-    return { primary, spouse }
+    return [primary, spouse]
 }
 
-function applyGrowth(assets: AssetBalances, categoryGrowthRates: Record<string, number>): void {
-    for (const type of Object.values(AssetType)) {
-        const growthRate = growthRateFor(categoryGrowthRates, type)
-        assets[type] *= 1 + growthRate
-    }
-}
-
-function applyMarketShock(assets: AssetBalances, shockMultiplier: number): void {
-    for (const type of Object.values(AssetType)) {
-        if (getGrowthCategory(type) === "stocks") {
-            assets[type] *= shockMultiplier
+function applyGrowth(assetPools: AssetPool[], categoryGrowthRates: Record<string, number>): void {
+    for (const assets of assetPools) {
+        for (const type of Object.values(AssetType)) {
+            const growthRate = growthRateFor(categoryGrowthRates, type)
+            assets[type] *= 1 + growthRate
         }
     }
 }
 
-function sumAssets(assets: AssetBalances): number {
-    return assets.cash + assets.isa + assets.pension + assets.property
+function applyMarketShock(assetPools: AssetPool[], shock?: MarketShock): void {
+    if (!shock) {
+        return
+    }
+    for (const assets of assetPools) {
+        for (const type of Object.values(AssetType)) {
+            if (getGrowthCategory(type) === "stocks") {
+                assets[type] *= (100 + shock.impactPercent) / 100
+            }
+        }
+    }
 }
 
-function combineAssets(primary: AssetBalances, spouse: AssetBalances): AssetBalances {
+function buildStatePensions(age: number, spouseAge: number, inflationMultiplier: number): number[] {
+    // Calculate state pension per person
+    return [
+        age >= STATE_PENSION_AGE ? UK_STATE_PENSION_2024 : 0,
+        spouseAge >= STATE_PENSION_AGE ? UK_STATE_PENSION_2024 : 0
+    ].map(v => v * inflationMultiplier)
+}
+
+function buildRetirementIncome(incomeSources: RetirementIncome[], year: number, inflationMultiplier: number): number[] {
+    if (!incomeSources) {
+        return [0, 0]
+    }
+    return incomeSources.reduce(
+        (acc, income) => {
+            if (income.enabled && year >= income.startYear && (!income.endYear || year <= income.endYear)) {
+                const growthRate = income.growthRate || 0
+                const inflation_multiplier = income.inflationAdjusted ? inflationMultiplier : 1
+                const growth_multiplier = Math.pow(1 + growthRate / 100, year - income.startYear)
+                const amount = income.annualAmount * inflation_multiplier * growth_multiplier
+
+                if (income.belongsToSpouse) {
+                    acc[AssetPoolType.SPOUSE] += amount
+                } else {
+                    acc[AssetPoolType.PRIMARY] += amount
+                }
+            }
+            return acc
+        },
+        [0, 0]
+    )
+}
+
+function combineAssets(pools: AssetPool[]): AssetPool {
     const combined = createEmptyAssetBalances()
-    for (const type of Object.values(AssetType)) {
-        combined[type] = primary[type] + spouse[type]
+    for (const pool of pools) {
+        for (const type of Object.values(AssetType)) {
+            combined[type] += pool[type]
+        }
     }
     return combined
+}
+
+enum AssetPoolType {
+    PRIMARY = 0,
+    SPOUSE = 1
+}
+
+function applyOneOffs(
+    assetPools: [AssetPool, AssetPool],
+    oneOffs: OneOff[],
+    ages: number[],
+    inflationMultiplier: number
+) {
+    const [age, spouseAge] = ages
+    oneOffs?.forEach(oneOff => {
+        if (!oneOff.enabled) {
+            return
+        }
+        const adjustedAmount = oneOff.amount * inflationMultiplier
+        if (oneOff.belongsToSpouse && spouseAge === oneOff.age) {
+            assetPools[AssetPoolType.SPOUSE].cash += adjustedAmount
+        } else if (age === oneOff.age) {
+            assetPools[AssetPoolType.PRIMARY].cash += adjustedAmount
+        }
+    })
 }
 
 export function calculateProjection(
@@ -70,10 +133,12 @@ export function calculateProjection(
 ): ProjectionResult {
     console.clear()
 
+    const { personal, assets, shocks, assumptions, incomeTax, incomeNeeds, retirementIncome, oneOffs } = data
+
     const currentYear = new Date().getFullYear()
-    const birthYear = new Date(data.personal.dateOfBirth).getFullYear()
+    const birthYear = new Date(personal.dateOfBirth).getFullYear()
     const currentAge = currentYear - birthYear
-    const retirementAge = data.personal.retirementAge
+    const retirementAge = personal.retirementAge
 
     // Limit the projection to at most `maxYears` from the current age, with an absolute
     // upper bound of age 100 to avoid runaway loops. Default is Infinity (effectively up to 100).
@@ -81,126 +146,95 @@ export function calculateProjection(
     const yearlyData: YearlyDatapoint[] = []
 
     // Build separate asset maps for primary and spouse
-    const { primary: primaryAssets, spouse: spouseAssets } = buildAssetsByOwner(data.assets)
+    const assetPools = buildAssetPools(assets)
 
-    const spouseBirthYear = data.personal.spouseDateOfBirth
-        ? new Date(data.personal.spouseDateOfBirth).getFullYear()
-        : null
+    const spouseBirthYear = personal.spouseDateOfBirth ? new Date(personal.spouseDateOfBirth).getFullYear() : null
 
     let runsOutAt: number = 0
 
     for (let age = currentAge; age <= maxAge; age++) {
         const year = birthYear + age
         const yearsFromNow = year - currentYear
-        const inflationMultiplier = Math.pow(1 + data.assumptions.inflationRate / 100, yearsFromNow)
+        const inflationMultiplier = Math.pow(1 + assumptions.inflationRate / 100, yearsFromNow)
+        const spouseAge = year - (spouseBirthYear || Number.NaN)
+        const ages = [age, spouseAge]
 
-        // Apply growth to both asset pools
-        applyGrowth(primaryAssets, data.assumptions.categoryGrowthRates)
-        applyGrowth(spouseAssets, data.assumptions.categoryGrowthRates)
+        applyGrowth(assetPools, assumptions.categoryGrowthRates)
+        applyOneOffs(assetPools, oneOffs, ages, inflationMultiplier)
+        applyMarketShock(
+            assetPools,
+            shocks.find(s => s.year === year)
+        )
 
-        // Handle one-off events - add to correct owner's cash
-        if (data.oneOffs) {
-            data.oneOffs.forEach(oneOff => {
-                if (oneOff.enabled && age === oneOff.age) {
-                    const adjustedAmount = oneOff.amount * inflationMultiplier
-                    if (oneOff.belongsToSpouse) {
-                        spouseAssets.cash += adjustedAmount
-                    } else {
-                        primaryAssets.cash += adjustedAmount
-                    }
-                }
-            })
-        }
+        const statePensionIncome = buildStatePensions(age, spouseAge, inflationMultiplier)
+        const otherIncome = buildRetirementIncome(retirementIncome, year, inflationMultiplier)
 
-        // Apply market shocks to both pools
-        const shock = data.shocks.find(s => s.year === year)
-        if (shock) {
-            const shockMultiplier = 1 + shock.impactPercent / 100
-            applyMarketShock(primaryAssets, shockMultiplier)
-            applyMarketShock(spouseAssets, shockMultiplier)
-        }
-
-        // Calculate state pension per person
-        let primaryStatePension = 0
-        let spouseStatePension = 0
-
-        if (age >= STATE_PENSION_AGE) {
-            primaryStatePension = UK_STATE_PENSION_2024
-        }
-
-        if (spouseBirthYear) {
-            const spouseAge = year - spouseBirthYear
-            if (spouseAge >= STATE_PENSION_AGE) {
-                spouseStatePension = UK_STATE_PENSION_2024
-            }
-        }
-
-        const adjustedPrimaryStatePension = primaryStatePension * inflationMultiplier
-        const adjustedSpouseStatePension = spouseStatePension * inflationMultiplier
-        const totalStatePension = adjustedPrimaryStatePension + adjustedSpouseStatePension
-
-        // Calculate retirement income per person
-        let primaryRetirementIncome = 0
-        let spouseRetirementIncome = 0
-
-        if (data.retirementIncome) {
-            data.retirementIncome.forEach(income => {
-                if (income.enabled && year >= income.startYear && (!income.endYear || year <= income.endYear)) {
-                    const growthRate = income.growthRate || 0
-                    const inflation_multiplier = income.inflationAdjusted ? inflationMultiplier : 1
-                    const growth_multiplier = Math.pow(1 + growthRate / 100, year - income.startYear)
-                    const amount = income.annualAmount * inflation_multiplier * growth_multiplier
-
-                    if (income.belongsToSpouse) {
-                        spouseRetirementIncome += amount
-                    } else {
-                        primaryRetirementIncome += amount
-                    }
-                }
-            })
-        }
-
-        const totalRetirementIncome = primaryRetirementIncome + spouseRetirementIncome
+        const taxableIncome = statePensionIncome.map((pension, i) => pension + otherIncome[i])
 
         // Calculate expenditure
-        let netExpenditure = 0
+        let expenditure = 0
         if (age >= retirementAge) {
-            const applicableNeed = getNetExpenditure(data.incomeNeeds, retirementAge, age)
+            const applicableNeed = getNetExpenditure(incomeNeeds, retirementAge, age)
             if (applicableNeed) {
-                netExpenditure = applicableNeed.annualAmount * inflationMultiplier
+                expenditure = applicableNeed.annualAmount * inflationMultiplier
             }
         }
 
-        let taxPayable = 0
-        let assetWithdrawals = 0
-        const baseTaxableIncome = totalStatePension + totalRetirementIncome
+        const baseTaxableIncome = sumNumbers(taxableIncome)
+
+        const taxPosition = taxableIncome.map(_ => initialTaxPosition(incomeTax, inflationMultiplier))
+        taxPosition.forEach((p, i) => {
+            const income = taxableIncome[i]
+            taxPosition[i] = updateTaxPosition(income, p)
+        })
+
+        const initialTaxLiability = taxPosition.map(p => p.tax)
+
+        const initialCashLiability = -sumNumbers(assetPools.map(pool => Math.min(0, pool.cash)))
+        assetPools.forEach(pool => {
+            // Ensure cash pool non-negative (negative cash is added to shortfall)
+            pool.cash = Math.max(0, pool.cash)
+        })
+
+        const startingAssets = assetPools.map(pool => ({
+            ...pool
+        }))
 
         if (age >= retirementAge) {
-            const netShortfall = netExpenditure - baseTaxableIncome
+            // Initial tax liability is handled in `execute` method, so just include the initial cash liability here
+            const shortfall = expenditure - baseTaxableIncome + initialCashLiability
 
-            if (netShortfall > 0) {
-                const result = run_shortfall_calculation_split(
-                    data,
-                    primaryAssets,
-                    spouseAssets,
-                    netShortfall,
-                    adjustedPrimaryStatePension,
-                    adjustedSpouseStatePension,
-                    primaryRetirementIncome,
-                    spouseRetirementIncome,
-                    strategy
-                )
-                taxPayable = result.primaryTax + result.spouseTax
-                assetWithdrawals =
-                    result.primaryWithdrawn + result.spouseWithdrawn + result.primaryTax + result.spouseTax
+            if (shortfall > 0) {
+                const growthRates = Object.fromEntries(
+                    Object.values(AssetType).map(type => [type, growthRateFor(assumptions.categoryGrowthRates, type)])
+                ) as Record<AssetType, number>
 
-                primaryAssets.cash -= result.primaryTax
-                spouseAssets.cash -= result.spouseTax
+                const strategyInstance = createDrawdownStrategy(strategy, incomeTax, growthRates)
+                strategyInstance.execute(assetPools, shortfall, taxPosition)
             }
         }
+
+        const totalWithdrawals = assetPools.map((pool, i) => {
+            return assetTypes.reduce((sum, type) => sum + startingAssets[i][type] - pool[type], 0)
+        })
+
+        const taxableWithdrawals = assetPools.map((pool, i) => {
+            return assetTypes
+                .filter(type => isTaxable(type))
+                .reduce((sum, type) => sum + startingAssets[i][type] - pool[type], 0)
+        })
+
+        taxableWithdrawals.forEach((taxable, i) => {
+            taxPosition[i] = updateTaxPosition(taxable, taxPosition[i])
+        })
+
+        assetPools.forEach((pool, i) => {
+            const additionalTax = taxPosition[i].tax - initialTaxLiability[i]
+            pool.cash -= additionalTax
+        })
 
         // Combine assets for chart display
-        const combinedAssets = combineAssets(primaryAssets, spouseAssets)
+        const combinedAssets = combineAssets(assetPools)
         const currentTotalAssets = sumAssets(combinedAssets)
 
         yearlyData.push({
@@ -212,11 +246,11 @@ export function calculateProjection(
             pension: Math.max(0, combinedAssets.pension),
             property: Math.max(0, combinedAssets.property),
             income: baseTaxableIncome,
-            expenditure: netExpenditure,
-            statePension: totalStatePension,
-            retirementIncome: totalRetirementIncome,
-            taxPayable,
-            assetWithdrawals
+            expenditure: expenditure,
+            statePension: sumNumbers(statePensionIncome),
+            retirementIncome: sumNumbers(otherIncome),
+            taxPayable: sumNumbers(taxPosition.map(p => p.tax)),
+            assetWithdrawals: sumNumbers(totalWithdrawals)
         })
 
         if (currentTotalAssets <= 0 && !runsOutAt && age >= retirementAge) {
