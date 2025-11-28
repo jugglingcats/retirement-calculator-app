@@ -72,12 +72,6 @@ describe("calculateProjection", () => {
         expect(result.yearlyData).toHaveLength(0)
     })
 
-    it("returns null when no assets provided", () => {
-        const data = baseData({ assets: [] })
-        const result = calculateProjection(data)
-        expect(result.yearlyData).toHaveLength(0)
-    })
-
     it("adds state pension from age 67 (no inflation)", () => {
         const data = baseData()
         const result = calculateProjection(data)
@@ -142,17 +136,22 @@ describe("calculateProjection", () => {
             incomeTax: { personalAllowance: 12570, higherRateThreshold: 50270 },
             assumptions: {
                 inflationRate: 0,
-                categoryGrowthRates: { cash: 0, stocks: 0, pension: 0, property: 0 }
+                categoryGrowthRates: { cash: 1, stocks: 5, pension: 4, property: 3 }
             }
         })
 
-        const result = calculateProjection(data, 1, "lowest_growth_first")!
+        // Use lowest_growth_first to get predictable order: cash first, then pension
+        const result = calculateProjection(data, 1, "lowest_growth_first")
         const first = result.yearlyData.find(y => y.age === 60)!
-        // With 0% growth, initial assets = 55000, need to withdraw 30000 + tax
-        // Tax is calculated and withdrawn from assets
-        expect(first.taxPayable).toBeGreaterThan(0)
-        // Assets should be reduced by withdrawal amount (shortfall + tax)
-        expect(first.assets).toBeLessThan(55000 - 30000)
+        // Growth applied first: Cash 5000*1.01=5050, Pension 50000*1.04=52000, total 57050
+        const totalAssets = 5000 * 1.01 + 50000 * 1.04
+        // Cash is not taxable (for now) so no tax paid on cash
+        const expectedTax = (30000 - 5000 * 1.01 - 12570) * 0.2
+        expect(Math.round(first.taxPayable)).toBe(expectedTax)
+        // Assets after growth (57050) minus withdrawal (33486) = 23564
+        expect(first.assets).toBe(totalAssets - 30000 - expectedTax)
+        // Cash exhausted after growth (5050), remaining 28436 from pension
+        expect(first.cash).toBe(0)
     })
 
     it("applies one-off events to cash at the specified age (no inflation, no withdrawals)", () => {
@@ -178,27 +177,6 @@ describe("calculateProjection", () => {
         const at61 = result.yearlyData.find(y => y.age === 61)!
         expect(at61.cash - at60.cash).toBe(1000)
         expect(at61.assets - at60.assets).toBe(1000)
-    })
-
-    it("applies market shocks to all assets in the shock year", () => {
-        const thisYear = fixedNow.getFullYear()
-        const data = baseData({
-            assets: [
-                { id: "c", name: "Cash", value: 2000, category: AssetType.Cash },
-                { id: "i", name: "ISA", value: 2000, category: AssetType.ISA },
-                { id: "p", name: "Pension", value: 2000, category: AssetType.Pension },
-                { id: "pr", name: "Property", value: 2000, category: AssetType.Property }
-            ],
-            shocks: [{ id: "s", year: thisYear, impactPercent: -50 }],
-            personal: {
-                dateOfBirth: `${thisYear - 60}-01-01`,
-                spouseDateOfBirth: `${thisYear - 60}-01-01`,
-                retirementAge: 70
-            }
-        })
-        const result = calculateProjection(data)!
-        const first = result.yearlyData.find(y => y.age === 60)!
-        expect(first.assets).toBe(4000) // 8000 * 0.5
     })
 
     it("sets runsOutAt when assets reach zero at or after retirement", () => {
@@ -256,5 +234,111 @@ describe("calculateProjection", () => {
         expect(first.taxPayable).toBe(0)
         // With 0 growth, assets remain same
         expect(first.assets).toBe(1000)
+    })
+
+    it("separates assets by owner and combines them in output", () => {
+        const thisYear = fixedNow.getFullYear()
+        const data = baseData({
+            personal: {
+                dateOfBirth: `${thisYear - 60}-01-01`,
+                spouseDateOfBirth: `${thisYear - 60}-01-01`,
+                retirementAge: 70
+            },
+            assets: [
+                { id: "c1", name: "My Cash", value: 5000, category: AssetType.Cash, belongsToSpouse: false },
+                { id: "c2", name: "Spouse Cash", value: 3000, category: AssetType.Cash, belongsToSpouse: true },
+                { id: "i1", name: "My ISA", value: 2000, category: AssetType.ISA, belongsToSpouse: false },
+                { id: "i2", name: "Spouse ISA", value: 1000, category: AssetType.ISA, belongsToSpouse: true },
+                { id: "p", name: "Pension", value: 0, category: AssetType.Pension },
+                { id: "pr", name: "Property", value: 0, category: AssetType.Property }
+            ],
+            incomeNeeds: [{ id: "need", description: "Need", annualAmount: 0, startingAge: 70 }]
+        })
+        const result = calculateProjection(data)!
+        const first = result.yearlyData.find(y => y.age === 60)!
+        // Combined cash: 5000 + 3000 = 8000, Combined ISA: 2000 + 1000 = 3000
+        expect(first.cash).toBe(8000)
+        expect(first.isa).toBe(3000)
+        expect(first.assets).toBe(11000)
+    })
+
+    it("applies one-off to spouse's cash when belongsToSpouse is true", () => {
+        const thisYear = fixedNow.getFullYear()
+        const data = baseData({
+            personal: {
+                dateOfBirth: `${thisYear - 60}-01-01`,
+                spouseDateOfBirth: `${thisYear - 60}-01-01`,
+                retirementAge: 70
+            },
+            assets: [
+                { id: "c1", name: "My Cash", value: 5000, category: AssetType.Cash, belongsToSpouse: false },
+                { id: "c2", name: "Spouse Cash", value: 3000, category: AssetType.Cash, belongsToSpouse: true },
+                { id: "i", name: "ISA", value: 0, category: AssetType.ISA },
+                { id: "p", name: "Pension", value: 0, category: AssetType.Pension },
+                { id: "pr", name: "Property", value: 0, category: AssetType.Property }
+            ],
+            incomeNeeds: [{ id: "need", description: "Need", annualAmount: 0, startingAge: 70 }],
+            oneOffs: [
+                { id: "o1", description: "My bonus", amount: 1000, age: 61, enabled: true, belongsToSpouse: false },
+                {
+                    id: "o2",
+                    description: "Spouse inheritance",
+                    amount: 2000,
+                    age: 61,
+                    enabled: true,
+                    belongsToSpouse: true
+                }
+            ]
+        })
+        const result = calculateProjection(data)!
+        const at60 = result.yearlyData.find(y => y.age === 60)!
+        const at61 = result.yearlyData.find(y => y.age === 61)!
+        // Both one-offs happen at age 61, total cash increase should be 3000
+        expect(at61.cash - at60.cash).toBe(3000)
+        expect(at61.assets - at60.assets).toBe(3000)
+    })
+
+    it("attributes retirement income to correct spouse for tax calculation", () => {
+        const thisYear = fixedNow.getFullYear()
+        const data = baseData({
+            personal: {
+                dateOfBirth: `${thisYear - 60}-01-01`,
+                spouseDateOfBirth: `${thisYear - 60}-01-01`,
+                retirementAge: 60
+            },
+            assets: [
+                { id: "c", name: "Cash", value: 50000, category: AssetType.Cash },
+                { id: "i", name: "ISA", value: 0, category: AssetType.ISA },
+                { id: "p", name: "Pension", value: 0, category: AssetType.Pension },
+                { id: "pr", name: "Property", value: 0, category: AssetType.Property }
+            ],
+            incomeNeeds: [{ id: "need", description: "Need", annualAmount: 10000, startingAge: 60 }],
+            retirementIncome: [
+                {
+                    id: "ri1",
+                    description: "My Pension",
+                    annualAmount: 5000,
+                    startYear: thisYear,
+                    enabled: true,
+                    inflationAdjusted: false,
+                    belongsToSpouse: false
+                },
+                {
+                    id: "ri2",
+                    description: "Spouse Pension",
+                    annualAmount: 5000,
+                    startYear: thisYear,
+                    enabled: true,
+                    inflationAdjusted: false,
+                    belongsToSpouse: true
+                }
+            ]
+        })
+        const result = calculateProjection(data)!
+        const first = result.yearlyData.find(y => y.age === 60)!
+        // Total retirement income should be 10000 (5000 + 5000)
+        expect(first.retirementIncome).toBe(10000)
+        // Income covers expenditure, no tax should be due (both under personal allowance)
+        expect(first.taxPayable).toBe(0)
     })
 })

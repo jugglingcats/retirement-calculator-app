@@ -18,6 +18,7 @@ export interface Asset {
     name: string
     value: number
     category: AssetType
+    belongsToSpouse?: boolean
 }
 
 export interface IncomeNeed {
@@ -52,7 +53,8 @@ export interface RetirementIncome {
     endYear?: number // Added optional ending year
     enabled: boolean
     inflationAdjusted: boolean
-    growthRate?: number // Added optional custom growth rate
+    growthRate?: number // Added optional custom growth rate (could be on top of inflation)
+    belongsToSpouse?: boolean
 }
 
 export interface OneOff {
@@ -61,6 +63,7 @@ export interface OneOff {
     amount: number // Can be negative for expenses
     age: number
     enabled: boolean
+    belongsToSpouse?: boolean
 }
 
 export interface RetirementData {

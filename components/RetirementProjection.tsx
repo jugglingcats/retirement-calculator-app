@@ -1,19 +1,20 @@
 "use client"
 
 import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
     Area,
-    AreaChart
+    AreaChart,
+    Bar,
+    CartesianGrid,
+    ComposedChart,
+    Legend,
+    Line,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
-import type { RetirementData, DrawdownStrategy } from "@/types"
+import type { DrawdownStrategy, RetirementData } from "@/types"
 import { useState } from "react"
 
 interface Props {
@@ -22,9 +23,8 @@ interface Props {
 
 export default function RetirementProjection({ data }: Props) {
     const [strategy, setStrategy] = useState<DrawdownStrategy>("balanced")
-    const projection = calculateProjection(data, Infinity, strategy)
 
-    if (!projection) {
+    if (!data.personal.dateOfBirth || data.assets.length === 0) {
         return (
             <div className="p-8 bg-gray-100 rounded-lg text-center text-gray-600">
                 Please complete the Personal Info, Assets, and Income Needs sections to see your retirement projection.
@@ -32,7 +32,7 @@ export default function RetirementProjection({ data }: Props) {
         )
     }
 
-    const { yearlyData, runsOutAt, currentAssets } = projection
+    const { yearlyData, runsOutAt, currentAssets } = calculateProjection(data, Infinity, strategy)
     const birthYear = new Date(data.personal.dateOfBirth).getFullYear()
 
     // Custom X-axis tick to render Year on first line and Age on second line
@@ -123,6 +123,7 @@ export default function RetirementProjection({ data }: Props) {
                                         : "bg-white text-gray-700 hover:bg-gray-50"
                                 }`}
                                 onClick={() => setStrategy("balanced")}
+                                title="Withdraw proportionally from each asset class based on their relative sizes"
                             >
                                 Balanced
                             </button>
@@ -134,8 +135,21 @@ export default function RetirementProjection({ data }: Props) {
                                         : "bg-white text-gray-700 hover:bg-gray-50"
                                 }`}
                                 onClick={() => setStrategy("lowest_growth_first")}
+                                title="Draw from the asset class with the lowest growth rate first to preserve higher-growth assets"
                             >
                                 Lowest growth first
+                            </button>
+                            <button
+                                type="button"
+                                className={`px-3 py-1.5 text-sm border-l border-gray-200 ${
+                                    strategy === "tax_optimized"
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-white text-gray-700 hover:bg-gray-50"
+                                }`}
+                                onClick={() => setStrategy("tax_optimized")}
+                                title="Draw from taxable assets up to the higher rate threshold, then use ISAs to avoid higher rate tax"
+                            >
+                                Tax optimised
                             </button>
                         </div>
                     </div>
@@ -246,7 +260,7 @@ export default function RetirementProjection({ data }: Props) {
             <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Annual Income vs Expenditure</h3>
                 <ResponsiveContainer width="100%" height={400}>
-                    <LineChart data={yearlyData} margin={{ top: 10, right: 20, left: 60, bottom: 30 }}>
+                    <ComposedChart data={yearlyData} margin={{ top: 10, right: 20, left: 60, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis dataKey="year" stroke="#6b7280" tick={{ fill: "#6b7280" }} />
                         <YAxis
@@ -263,42 +277,35 @@ export default function RetirementProjection({ data }: Props) {
                             contentStyle={{ background: "white", border: "2px solid #e5e7eb", borderRadius: "8px" }}
                         />
                         <Legend />
-                        <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} name="Total Income" />
-                        <Line
-                            type="monotone"
-                            dataKey="retirementIncome"
-                            stroke="#8b5cf6"
-                            strokeWidth={2}
-                            strokeDasharray="5 5"
-                            name="Retirement Income"
-                            dot={false}
-                        />
-                        <Line
-                            type="monotone"
-                            dataKey="statePension"
-                            stroke="#34d399"
-                            strokeWidth={2}
-                            strokeDasharray="5 5"
-                            name="State Pension"
-                            dot={false}
-                        />
+                        <Bar dataKey="statePension" stackId="income" fill="#34d399" name="State Pension" />
+                        <Bar dataKey="retirementIncome" stackId="income" fill="#8b5cf6" name="Retirement Income" />
+                        <Bar dataKey="assetWithdrawals" stackId="income" fill="#6366f1" name="Asset Withdrawals" />
                         <Line
                             type="monotone"
                             dataKey="expenditure"
                             stroke="#ef4444"
                             strokeWidth={2}
                             name="Expenditure"
+                            dot={false}
                         />
                         <Line
                             type="monotone"
                             dataKey="taxPayable"
                             stroke="#f97316"
                             strokeWidth={2}
-                            strokeDasharray="3 3"
                             name="Tax Payable"
                             dot={false}
                         />
-                    </LineChart>
+                        <Line
+                            type="monotone"
+                            dataKey={(d: any) => (d.expenditure || 0) + (d.taxPayable || 0)}
+                            stroke="#6b7280"
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            name="Total (Exp + Tax)"
+                            dot={false}
+                        />
+                    </ComposedChart>
                 </ResponsiveContainer>
             </div>
         </div>

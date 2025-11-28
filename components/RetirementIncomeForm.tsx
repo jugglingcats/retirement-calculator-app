@@ -17,7 +17,8 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
         endYear: undefined,
         enabled: true,
         inflationAdjusted: true,
-        growthRate: undefined
+        growthRate: undefined,
+        belongsToSpouse: false
     })
 
     const [editingId, setEditingId] = useState<string | null>(null)
@@ -38,7 +39,8 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                 endYear: undefined,
                 enabled: true,
                 inflationAdjusted: true,
-                growthRate: undefined
+                growthRate: undefined,
+                belongsToSpouse: false
             })
         }
     }
@@ -197,6 +199,19 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                     </div>
                 </div>
 
+                <div className="md:col-span-6 flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="newIncomeBelongsToSpouse"
+                        checked={newIncome.belongsToSpouse || false}
+                        onChange={e => setNewIncome({ ...newIncome, belongsToSpouse: e.target.checked })}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="newIncomeBelongsToSpouse" className="text-sm font-medium text-gray-700">
+                        Belongs to spouse
+                    </label>
+                </div>
+
                 <button
                     type="submit"
                     className="md:col-span-6 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
@@ -327,6 +342,26 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                                 />
                                             </div>
                                         </div>
+                                        <div className="md:col-span-5 flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id={`editIncomeBelongsToSpouse-${income.id}`}
+                                                checked={displayData.belongsToSpouse || false}
+                                                onChange={e =>
+                                                    setEditingData({
+                                                        ...editingData!,
+                                                        belongsToSpouse: e.target.checked
+                                                    })
+                                                }
+                                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                            />
+                                            <label
+                                                htmlFor={`editIncomeBelongsToSpouse-${income.id}`}
+                                                className="text-sm font-medium text-gray-700"
+                                            >
+                                                Belongs to spouse
+                                            </label>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
@@ -355,6 +390,13 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                             <div className="text-sm text-gray-700">
                                                 {displayData.inflationAdjusted ? "Adjusted" : "Fixed"}
                                             </div>
+                                        </div>
+                                        <div>
+                                            {displayData.belongsToSpouse && (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    Spouse
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 )}

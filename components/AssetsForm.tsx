@@ -13,7 +13,8 @@ export default function AssetsForm({ data, setData }: Props) {
         id: "",
         name: "",
         value: 0,
-        category: AssetType.Pension
+        category: AssetType.Pension,
+        belongsToSpouse: false
     })
 
     const [editingId, setEditingId] = useState<string | null>(null)
@@ -35,7 +36,7 @@ export default function AssetsForm({ data, setData }: Props) {
                 ...data,
                 assets: [...data.assets, { ...newAsset, id: Date.now().toString() }]
             })
-            setNewAsset({ id: "", name: "", value: 0, category: AssetType.Pension })
+            setNewAsset({ id: "", name: "", value: 0, category: AssetType.Pension, belongsToSpouse: false })
         }
     }
 
@@ -114,6 +115,19 @@ export default function AssetsForm({ data, setData }: Props) {
                     </select>
                 </div>
 
+                <div className="md:col-span-3 flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="newAssetBelongsToSpouse"
+                        checked={newAsset.belongsToSpouse || false}
+                        onChange={e => setNewAsset({ ...newAsset, belongsToSpouse: e.target.checked })}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="newAssetBelongsToSpouse" className="text-sm font-medium text-gray-700">
+                        Belongs to spouse
+                    </label>
+                </div>
+
                 <button
                     type="submit"
                     className="md:col-span-3 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
@@ -187,6 +201,26 @@ export default function AssetsForm({ data, setData }: Props) {
                                                     ))}
                                                 </select>
                                             </div>
+                                            <div className="md:col-span-3 flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`editAssetBelongsToSpouse-${asset.id}`}
+                                                    checked={displayData.belongsToSpouse || false}
+                                                    onChange={e =>
+                                                        setEditingData({
+                                                            ...editingData!,
+                                                            belongsToSpouse: e.target.checked
+                                                        })
+                                                    }
+                                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                                />
+                                                <label
+                                                    htmlFor={`editAssetBelongsToSpouse-${asset.id}`}
+                                                    className="text-sm font-medium text-gray-700"
+                                                >
+                                                    Belongs to spouse
+                                                </label>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
@@ -199,7 +233,13 @@ export default function AssetsForm({ data, setData }: Props) {
                                             <div className="font-semibold text-gray-900">
                                                 £{displayData.value.toLocaleString()}
                                             </div>
-                                            <div></div>
+                                            <div>
+                                                {displayData.belongsToSpouse && (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                        Spouse
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 

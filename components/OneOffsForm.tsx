@@ -13,7 +13,8 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
         description: "",
         amount: 0,
         age: 65,
-        enabled: true
+        enabled: true,
+        belongsToSpouse: false
     })
 
     const [editingId, setEditingId] = useState<string | null>(null)
@@ -34,7 +35,8 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
                 description: "",
                 amount: 0,
                 age: 65,
-                enabled: true
+                enabled: true,
+                belongsToSpouse: false
             })
         }
     }
@@ -121,6 +123,18 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
                         required
                     />
                 </div>
+                <div className="md:col-span-3 flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="newOneOffBelongsToSpouse"
+                        checked={newOneOff.belongsToSpouse || false}
+                        onChange={e => setNewOneOff({ ...newOneOff, belongsToSpouse: e.target.checked })}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="newOneOffBelongsToSpouse" className="text-sm font-medium text-gray-700">
+                        Belongs to spouse
+                    </label>
+                </div>
                 <button
                     type="submit"
                     className="md:col-span-3 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
@@ -186,6 +200,26 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
                                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                             />
                                         </div>
+                                        <div className="md:col-span-4 flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id={`editOneOffBelongsToSpouse-${oneOff.id}`}
+                                                checked={displayData.belongsToSpouse || false}
+                                                onChange={e =>
+                                                    setEditingData({
+                                                        ...editingData!,
+                                                        belongsToSpouse: e.target.checked
+                                                    })
+                                                }
+                                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                            />
+                                            <label
+                                                htmlFor={`editOneOffBelongsToSpouse-${oneOff.id}`}
+                                                className="text-sm font-medium text-gray-700"
+                                            >
+                                                Belongs to spouse
+                                            </label>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
@@ -204,6 +238,13 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
                                             £{displayData.amount.toLocaleString()}
                                         </div>
                                         <div className="text-gray-700">At age {displayData.age}</div>
+                                        <div>
+                                            {displayData.belongsToSpouse && (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                    Spouse
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
