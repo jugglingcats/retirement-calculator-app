@@ -242,6 +242,7 @@ export function calculateProjection(
             age,
             assets: Math.max(0, currentTotalAssets),
             cash: Math.max(0, combinedAssets.cash),
+            stocks: Math.max(0, combinedAssets.stocks),
             isa: Math.max(0, combinedAssets.isa),
             pension: Math.max(0, combinedAssets.pension),
             property: Math.max(0, combinedAssets.property),

@@ -15,7 +15,7 @@ import {
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
 import type { DrawdownStrategy, RetirementData } from "@/types"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 interface Props {
     data: RetirementData
@@ -32,7 +32,28 @@ export default function RetirementProjection({ data }: Props) {
         )
     }
 
-    const { yearlyData, runsOutAt, currentAssets } = calculateProjection(data, Infinity, strategy)
+    // Precompute projections for all strategies so the Y-axis can use a fixed scale
+    const projections = useMemo(() => {
+        return {
+            balanced: calculateProjection(data, Infinity, "balanced"),
+            lowest_growth_first: calculateProjection(data, Infinity, "lowest_growth_first"),
+            tax_optimized: calculateProjection(data, Infinity, "tax_optimized")
+        } as Record<DrawdownStrategy, ReturnType<typeof calculateProjection>>
+    }, [data])
+
+    // Use the currently selected strategy's results for most UI elements
+    const { yearlyData, runsOutAt, currentAssets } = projections[strategy]
+
+    // Compute the fixed Y-axis max as the largest total assets across all strategies and years
+    const fixedYAxisMax = useMemo(() => {
+        const maxFrom = (arr: typeof yearlyData) => (arr.length ? Math.max(...arr.map(d => d.assets || 0)) : 0)
+        const m1 = maxFrom(projections.balanced.yearlyData)
+        const m2 = maxFrom(projections.lowest_growth_first.yearlyData)
+        const m3 = maxFrom(projections.tax_optimized.yearlyData)
+        const max = Math.max(0, m1, m2, m3)
+        // Add a small headroom to avoid clipping the top of the stacked areas
+        return Math.ceil(max * 1.05)
+    }, [projections, yearlyData])
     const birthYear = new Date(data.personal.dateOfBirth).getFullYear()
 
     // Custom X-axis tick to render Year on first line and Age on second line
@@ -170,6 +191,7 @@ export default function RetirementProjection({ data }: Props) {
                             stroke="#6b7280"
                             tick={{ fill: "#6b7280" }}
                             tickFormatter={value => `£${(value / 1000).toFixed(0)}k`}
+                            domain={[0, fixedYAxisMax]}
                         />
                         <Tooltip
                             labelFormatter={(label: any) => `Year ${label}`}
@@ -216,19 +238,28 @@ export default function RetirementProjection({ data }: Props) {
                         <Area
                             type="step"
                             alignmentBaseline="before-edge"
+                            dataKey="stocks"
+                            stackId="1"
+                            stroke="#0ea5e9"
+                            fill="#0ea5e9"
+                            name="Stocks"
+                        />
+                        <Area
+                            type="step"
+                            alignmentBaseline="before-edge"
                             dataKey="isa"
                             stackId="1"
-                            stroke="#6366f1"
-                            fill="#6366f1"
-                            name="ISA (Tax-Free)"
+                            stroke="#1d4ed8"
+                            fill="#1d4ed8"
+                            name="ISAs"
                         />
                         <Area
                             type="step"
                             alignmentBaseline="before-edge"
                             dataKey="pension"
                             stackId="1"
-                            stroke="#8b5cf6"
-                            fill="#8b5cf6"
+                            stroke="#a855f7"
+                            fill="#a855f7"
                             name="Pension"
                         />
                         <Area
@@ -261,6 +292,19 @@ export default function RetirementProjection({ data }: Props) {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Annual Income vs Expenditure</h3>
                 <ResponsiveContainer width="100%" height={400}>
                     <ComposedChart data={yearlyData} margin={{ top: 10, right: 20, left: 60, bottom: 30 }}>
+                        <defs>
+                            {/* Subtle hatch pattern to indicate unfavourable outflows without overpowering */}
+                            <pattern
+                                id="withdrawHatch"
+                                patternUnits="userSpaceOnUse"
+                                width="6"
+                                height="6"
+                                patternTransform="rotate(45)"
+                            >
+                                <rect width="6" height="6" fill="#9a3412" opacity="0.12" />
+                                <line x1="0" y1="0" x2="0" y2="6" stroke="#9a3412" strokeWidth="2" opacity="0.45" />
+                            </pattern>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis dataKey="year" stroke="#6b7280" tick={{ fill: "#6b7280" }} />
                         <YAxis
@@ -279,7 +323,13 @@ export default function RetirementProjection({ data }: Props) {
                         <Legend />
                         <Bar dataKey="statePension" stackId="income" fill="#34d399" name="State Pension" />
                         <Bar dataKey="retirementIncome" stackId="income" fill="#8b5cf6" name="Retirement Income" />
-                        <Bar dataKey="assetWithdrawals" stackId="income" fill="#6366f1" name="Asset Withdrawals" />
+                        <Bar
+                            dataKey="assetWithdrawals"
+                            stackId="income"
+                            fill="url(#withdrawHatch)"
+                            stroke="#9a3412"
+                            name="Asset Drawdown"
+                        />
                         <Line
                             type="monotone"
                             dataKey="expenditure"

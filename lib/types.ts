@@ -8,18 +8,6 @@ export interface TaxSettings {
     higherRateThreshold: number
 }
 
-export interface PersonIncomeData {
-    statePension: number
-    retirementIncome: number
-}
-
-export interface SplitShortfallResult {
-    primaryTax: number
-    spouseTax: number
-    primaryWithdrawn: number
-    spouseWithdrawn: number
-}
-
 export interface AssetDrawdownResult {
     remaining: number
     taxableWithdrawn: number
@@ -30,6 +18,7 @@ export type YearlyDatapoint = {
     age: number
     assets: number
     cash: number
+    stocks: number
     isa: number
     pension: number
     property: number
