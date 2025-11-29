@@ -1,6 +1,5 @@
 import { BaseDrawdownStrategy } from "@/lib/strategies/base"
-import { AssetPool, AssetDrawdownResult } from "@/lib/types"
-import { AssetType } from "@/types"
+import { AssetPool, AssetDrawdownResult, AssetType } from "@/lib/types"
 import { isTaxable } from "@/lib/utils"
 
 /**

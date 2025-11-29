@@ -1,5 +1,4 @@
-import { AssetPool } from "@/lib/types"
-import { AssetType, Assumptions } from "@/types"
+import { AssetPool, AssetType, Assumptions } from "@/lib/types"
 import { growthRateFor } from "@/lib/utils"
 
 function clamp(val: number, min: number, max: number) {
@@ -43,15 +42,16 @@ export function applyGrowth(
     // Determine ISA blended equity weight if glide path is configured and enabled
     const ibEnabled = assumptions.investmentBalanceEnabled ?? true
     const ib = assumptions.investmentBalance
-    const isaEquityWeight = ib && ibEnabled
-        ? equityPercentageForYear(
-              age,
-              retirementAge,
-              ib.initialEquityPercentage,
-              ib.targetEquityPercentage,
-              ib.yearsToTarget
-          ) / 100
-        : null
+    const isaEquityWeight =
+        ib && ibEnabled
+            ? equityPercentageForYear(
+                  age,
+                  retirementAge,
+                  ib.initialEquityPercentage,
+                  ib.targetEquityPercentage,
+                  ib.yearsToTarget
+              ) / 100
+            : null
 
     for (const assets of assetPools) {
         for (const type of Object.values(AssetType)) {

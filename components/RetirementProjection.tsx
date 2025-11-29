@@ -14,8 +14,8 @@ import {
     YAxis
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
-import type { DrawdownStrategy, RetirementData } from "@/types"
 import { useMemo, useState } from "react"
+import { DrawdownStrategy, RetirementData } from "@/lib/types"
 
 interface Props {
     data: RetirementData
@@ -135,7 +135,15 @@ export default function RetirementProjection({ data, setData }: Props) {
         const totalAbs = Math.abs(totalDelta)
 
         return (
-            <div style={{ background: "white", border: "2px solid #e5e7eb", borderRadius: 8, padding: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+            <div
+                style={{
+                    background: "white",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: 8,
+                    padding: 10,
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+                }}
+            >
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>Year {year}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {payload.map((item: any) => {
@@ -150,10 +158,22 @@ export default function RetirementProjection({ data, setData }: Props) {
                         const absDelta = Math.abs(delta)
                         return (
                             <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ width: 10, height: 10, background: color, borderRadius: 2, display: "inline-block" }} />
+                                <span
+                                    style={{
+                                        width: 10,
+                                        height: 10,
+                                        background: color,
+                                        borderRadius: 2,
+                                        display: "inline-block"
+                                    }}
+                                />
                                 <span style={{ color: "#374151" }}>{name}</span>
                                 <span style={{ marginLeft: "auto", color: "#111827" }}>
-                                    {formatGBP(currVal)} <span style={{ color: "#6b7280" }}>({arrow} {sign}{formatGBP(absDelta)})</span>
+                                    {formatGBP(currVal)}{" "}
+                                    <span style={{ color: "#6b7280" }}>
+                                        ({arrow} {sign}
+                                        {formatGBP(absDelta)})
+                                    </span>
                                 </span>
                             </div>
                         )
@@ -162,7 +182,11 @@ export default function RetirementProjection({ data, setData }: Props) {
                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #e5e7eb", display: "flex", gap: 8 }}>
                     <strong style={{ color: "#111827" }}>Total assets</strong>
                     <span style={{ marginLeft: "auto", color: "#111827" }}>
-                        {formatGBP(total)} <span style={{ color: "#6b7280" }}>({totalArrow} {totalSign}{formatGBP(totalAbs)})</span>
+                        {formatGBP(total)}{" "}
+                        <span style={{ color: "#6b7280" }}>
+                            ({totalArrow} {totalSign}
+                            {formatGBP(totalAbs)})
+                        </span>
                     </span>
                 </div>
             </div>
@@ -235,7 +259,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                                 className="w-5 h-5 text-indigo-600 border-2 border-gray-300 rounded focus:ring-indigo-500"
                             />
                             <label htmlFor="investmentBalanceProjection" className="text-sm text-gray-700">
-                                Investment balance
+                                Investment lifestyling
                             </label>
                         </div>
                         <span className="text-sm text-gray-600">Drawdown Strategy:</span>
@@ -286,7 +310,13 @@ export default function RetirementProjection({ data, setData }: Props) {
                     <AreaChart data={yearlyData} margin={{ top: 10, right: 20, left: 10, bottom: 30 }}>
                         <defs>
                             {/* Hatch pattern for crystallised pension - same colour as pension but hatched */}
-                            <pattern id="pensionHatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+                            <pattern
+                                id="pensionHatch"
+                                patternUnits="userSpaceOnUse"
+                                width="6"
+                                height="6"
+                                patternTransform="rotate(45)"
+                            >
                                 <rect width="6" height="6" fill="#a855f7" opacity="0.15" />
                                 <line x1="0" y1="0" x2="0" y2="6" stroke="#a855f7" strokeWidth="2" opacity="0.6" />
                             </pattern>
@@ -406,10 +436,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                         />
                         <Tooltip
                             labelFormatter={(label: any) => `Year ${label}`}
-                            formatter={(value: number, name: string) => [
-                                formatGBP(Number(value || 0)),
-                                name || ""
-                            ]}
+                            formatter={(value: number, name: string) => [formatGBP(Number(value || 0)), name || ""]}
                             contentStyle={{ background: "white", border: "2px solid #e5e7eb", borderRadius: "8px" }}
                         />
                         <Legend />
@@ -422,12 +449,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                             stroke="#9a3412"
                             name="Asset Drawdown"
                         />
-                        <Bar
-                            dataKey="shortfall"
-                            stackId="income"
-                            fill="#ef4444"
-                            name="Shortfall"
-                        />
+                        <Bar dataKey="shortfall" stackId="income" fill="#ef4444" name="Shortfall" />
                         <Line
                             type="monotone"
                             dataKey="expenditure"

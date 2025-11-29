@@ -1,7 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { AssetType, Assumptions } from "@/types"
-import { AssetPool } from "@/lib/types"
+import { AssetPool, AssetType, Assumptions } from "@/lib/types"
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))

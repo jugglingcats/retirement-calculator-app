@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { RetirementData, OneOff } from "@/types"
+import { OneOff, RetirementData } from "@/lib/types"
 
 interface OneOffsFormProps {
     data: RetirementData

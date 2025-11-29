@@ -1,5 +1,4 @@
-import { AssetDrawdownResult, AssetPool, TaxPosition } from "@/lib/types"
-import { AssetType } from "@/types"
+import { AssetDrawdownResult, AssetPool, AssetType, TaxPosition } from "@/lib/types"
 import { BaseDrawdownStrategy } from "@/lib/strategies/base"
 
 /**

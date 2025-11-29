@@ -10,7 +10,8 @@ import AssumptionsForm from "@/components/AssumptionsForm"
 import ShocksForm from "@/components/ShocksForm"
 import OneOffsForm from "@/components/OneOffsForm" // Import OneOffsForm component
 import RetirementProjection from "@/components/RetirementProjection"
-import type { RetirementData } from "@/types"
+
+import { RetirementData } from "@/lib/types"
 
 const STORAGE_KEY = "retirement-calculator-data"
 

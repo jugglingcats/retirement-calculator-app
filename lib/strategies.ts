@@ -1,5 +1,4 @@
-import { AssetType } from "@/types"
-import { DrawdownStrategyType, TaxSettings } from "@/lib/types"
+import { AssetType, DrawdownStrategyType, TaxSettings } from "@/lib/types"
 import { BaseDrawdownStrategy } from "@/lib/strategies/base"
 import { BalancedStrategy } from "@/lib/strategies/strategyBalanced"
 import { LowestGrowthFirstStrategy } from "@/lib/strategies/strategyLowestGrowthFirst"

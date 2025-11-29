@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { applyGrowth } from "@/lib/annual/growth"
-import { AssetType, type Assumptions } from "@/types"
-import type { AssetPool } from "@/lib/types"
+import { AssetPool, AssetType, Assumptions } from "@/lib/types"
 
 function makePool(values: Partial<Record<AssetType, number>>): AssetPool {
     const base: Record<AssetType, number> = {
@@ -16,7 +15,7 @@ function makePool(values: Partial<Record<AssetType, number>>): AssetPool {
     return { ...base, ...(values as any) }
 }
 
-describe("applyGrowth with ISA investment balance glide path", () => {
+describe("applyGrowth with ISA investment lifestyling glide path", () => {
     const assumptions: Assumptions = {
         inflationRate: 0,
         categoryGrowthRates: {

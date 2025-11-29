@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { RetirementData, MarketShock } from "@/types"
+import { MarketShock, RetirementData } from "@/lib/types"
 
 interface Props {
     data: RetirementData

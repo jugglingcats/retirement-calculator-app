@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest"
 import { calculateProjection } from "@/lib/calculations"
-import { AssetType, RetirementData } from "@/types"
+import { AssetType, RetirementData } from "@/lib/types"
 
 function baseData(overrides: Partial<RetirementData> = {}): RetirementData {
     const current = new Date()
@@ -185,7 +185,13 @@ describe("Bed and ISA", () => {
                 },
                 assets: [
                     { id: "p1", name: "Pension", value: 100000, category: AssetType.Pension },
-                    { id: "p2", name: "Spouse Pension", value: 100000, category: AssetType.Pension, belongsToSpouse: true },
+                    {
+                        id: "p2",
+                        name: "Spouse Pension",
+                        value: 100000,
+                        category: AssetType.Pension,
+                        belongsToSpouse: true
+                    },
                     { id: "i1", name: "ISA", value: 0, category: AssetType.ISA },
                     { id: "i2", name: "Spouse ISA", value: 0, category: AssetType.ISA, belongsToSpouse: true }
                 ]
@@ -212,7 +218,13 @@ describe("Bed and ISA", () => {
                 },
                 assets: [
                     { id: "p1", name: "Pension", value: 100000, category: AssetType.Pension },
-                    { id: "p2", name: "Spouse Pension", value: 100000, category: AssetType.Pension, belongsToSpouse: true },
+                    {
+                        id: "p2",
+                        name: "Spouse Pension",
+                        value: 100000,
+                        category: AssetType.Pension,
+                        belongsToSpouse: true
+                    },
                     { id: "i1", name: "ISA", value: 0, category: AssetType.ISA },
                     { id: "i2", name: "Spouse ISA", value: 0, category: AssetType.ISA, belongsToSpouse: true }
                 ]
@@ -241,7 +253,13 @@ describe("Bed and ISA", () => {
                 },
                 assets: [
                     { id: "p1", name: "Pension", value: 40000, category: AssetType.Pension },
-                    { id: "p2", name: "Spouse Pension", value: 200000, category: AssetType.Pension, belongsToSpouse: true },
+                    {
+                        id: "p2",
+                        name: "Spouse Pension",
+                        value: 200000,
+                        category: AssetType.Pension,
+                        belongsToSpouse: true
+                    },
                     { id: "i1", name: "ISA", value: 0, category: AssetType.ISA },
                     { id: "i2", name: "Spouse ISA", value: 0, category: AssetType.ISA, belongsToSpouse: true }
                 ]
@@ -299,7 +317,13 @@ describe("Bed and ISA", () => {
                 },
                 assets: [
                     { id: "p1", name: "Pension", value: 30000, category: AssetType.Pension },
-                    { id: "p2", name: "Spouse Pension", value: 30000, category: AssetType.Pension, belongsToSpouse: true },
+                    {
+                        id: "p2",
+                        name: "Spouse Pension",
+                        value: 30000,
+                        category: AssetType.Pension,
+                        belongsToSpouse: true
+                    },
                     { id: "i1", name: "ISA", value: 0, category: AssetType.ISA },
                     { id: "i2", name: "Spouse ISA", value: 0, category: AssetType.ISA, belongsToSpouse: true }
                 ]

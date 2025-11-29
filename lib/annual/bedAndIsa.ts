@@ -1,5 +1,4 @@
-import { AssetPool } from "@/lib/types"
-import { AssetType } from "@/types"
+import { AssetPool, AssetType } from "@/lib/types"
 
 const BED_AND_ISA_MIN_AGE = 55
 const ANNUAL_ISA_ALLOWANCE = 20000

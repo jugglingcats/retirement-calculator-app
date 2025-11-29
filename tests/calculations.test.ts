@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest"
 import { calculateProjection } from "@/lib/calculations"
-import { AssetType, RetirementData } from "@/types"
+import { AssetType, RetirementData } from "@/lib/types"
 
 function baseData(overrides: Partial<RetirementData> = {}): RetirementData {
     const current = new Date()

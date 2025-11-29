@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { AssetType } from "@/types"
-import { AssetPool, AssetDrawdownResult, TaxSettings } from "@/lib/types"
+import { AssetPool, AssetDrawdownResult, TaxSettings, AssetType } from "@/lib/types"
 import { BalancedStrategy } from "@/lib/strategies/strategyBalanced"
 import { LowestGrowthFirstStrategy } from "@/lib/strategies/strategyLowestGrowthFirst"
 import { TaxOptimizedStrategy } from "@/lib/strategies/strategyTaxOptimized"

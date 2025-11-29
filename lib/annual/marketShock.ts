@@ -1,5 +1,4 @@
-import { AssetPool } from "@/lib/types"
-import { AssetType, MarketShock } from "@/types"
+import { AssetPool, AssetType, MarketShock } from "@/lib/types"
 import { getGrowthCategory } from "@/lib/utils"
 
 export function applyMarketShock(assetPools: AssetPool[], shock?: MarketShock): void {

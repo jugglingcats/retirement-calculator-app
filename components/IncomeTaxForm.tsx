@@ -1,7 +1,6 @@
 "use client"
 
-import type { RetirementData } from "@/types"
-import { TaxSettings } from "@/lib/types"
+import { RetirementData, TaxSettings } from "@/lib/types"
 
 interface Props {
     data: RetirementData

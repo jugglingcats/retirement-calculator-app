@@ -1,5 +1,4 @@
-import { AssetDrawdownResult, AssetPool, TaxPosition, TaxSettings } from "@/lib/types"
-import { AssetType } from "@/types"
+import { AssetDrawdownResult, AssetPool, AssetType, TaxPosition, TaxSettings } from "@/lib/types"
 import { sumAssets, sumNumbers } from "@/lib/utils"
 
 /**

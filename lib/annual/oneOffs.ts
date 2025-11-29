@@ -1,5 +1,4 @@
-import { AssetPool, AssetPoolType } from "@/lib/types"
-import { OneOff } from "@/types"
+import { AssetPool, AssetPoolType, OneOff } from "@/lib/types"
 
 export function applyOneOffs(
     assetPools: [AssetPool, AssetPool],

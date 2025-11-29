@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Asset, AssetType, RetirementData } from "@/types"
+import { Asset, AssetType, RetirementData } from "@/lib/types"
 
 interface Props {
     data: RetirementData

@@ -1,6 +1,14 @@
-import { AssetType, DrawdownStrategy, RetirementData, RetirementIncome } from "@/types"
 import { assetTypes, growthRateFor, isTaxable, sumAssets, sumNumbers } from "@/lib/utils"
-import { AssetPool, AssetPoolType, ProjectionResult, YearlyDatapoint } from "@/lib/types"
+import {
+    AssetPool,
+    AssetPoolType,
+    AssetType,
+    DrawdownStrategy,
+    ProjectionResult,
+    RetirementData,
+    RetirementIncome,
+    YearlyDatapoint
+} from "@/lib/types"
 import { initialTaxPosition, updateTaxPosition } from "@/lib/tax"
 import { createDrawdownStrategy } from "@/lib/strategies"
 import { applyBedAndISA } from "@/lib/annual/bedAndIsa"
@@ -113,6 +121,10 @@ export function calculateProjection(
         const year = birthYear + age
         const yearsFromNow = year - currentYear
         const inflationMultiplier = Math.pow(1 + assumptions.inflationRate / 100, yearsFromNow)
+        const taxBandMultiplier = Math.pow(
+            1 + (assumptions.taxBandIncreaseRate ?? assumptions.inflationRate) / 100,
+            yearsFromNow
+        )
         const spouseAge = year - (spouseBirthYear || Number.NaN)
         const ages = [age, spouseAge]
 
@@ -144,7 +156,7 @@ export function calculateProjection(
 
         const baseTaxableIncome = sumNumbers(taxableIncome)
 
-        const taxPosition = taxableIncome.map(_ => initialTaxPosition(incomeTax, inflationMultiplier))
+        const taxPosition = taxableIncome.map(_ => initialTaxPosition(incomeTax, taxBandMultiplier))
         taxPosition.forEach((p, i) => {
             const income = taxableIncome[i]
             taxPosition[i] = updateTaxPosition(income, p)
