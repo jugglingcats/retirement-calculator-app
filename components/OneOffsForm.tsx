@@ -132,7 +132,7 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     />
                     <label htmlFor="newOneOffBelongsToSpouse" className="text-sm font-medium text-gray-700">
-                        Belongs to spouse
+                        Belongs to partner
                     </label>
                 </div>
                 <button
@@ -217,7 +217,7 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
                                                 htmlFor={`editOneOffBelongsToSpouse-${oneOff.id}`}
                                                 className="text-sm font-medium text-gray-700"
                                             >
-                                                Belongs to spouse
+                                                Belongs to partner
                                             </label>
                                         </div>
                                     </div>

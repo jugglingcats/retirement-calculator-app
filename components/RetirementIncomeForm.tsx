@@ -105,7 +105,7 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
             <p className="text-gray-600 text-sm">
                 Define benefit pensions, annuities, and other guaranteed income sources. Enter the annual amount in
                 today&apos;s money and specify when it starts. You can choose whether each income should increase with
-                inflation or use a custom growth rate.
+                inflation or use a custom growth rate. You can also estimate the year when the income will end.
             </p>
 
             <form
@@ -208,7 +208,7 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     />
                     <label htmlFor="newIncomeBelongsToSpouse" className="text-sm font-medium text-gray-700">
-                        Belongs to spouse
+                        Belongs to partner
                     </label>
                 </div>
 
@@ -359,7 +359,7 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                                 htmlFor={`editIncomeBelongsToSpouse-${income.id}`}
                                                 className="text-sm font-medium text-gray-700"
                                             >
-                                                Belongs to spouse
+                                                Belongs to partner
                                             </label>
                                         </div>
                                     </div>

@@ -23,8 +23,13 @@ export default function IncomeTaxForm({ data, setData }: Props) {
             <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">UK Income Tax Settings</h2>
                 <p className="text-gray-600 mb-6">
-                    Configure tax thresholds for optimal drawdown calculations. These values are used to minimize your
-                    tax liability in retirement.
+                    Configure tax thresholds for optimal drawdown calculations. These values are used to calculate your
+                    tax liability in retirement. By default, these thresholds increase at the same rate as inflation but
+                    you can change this in the Assumptions tab.
+                </p>
+                <p className="text-gray-600 mb-6">
+                    Your tax liability changes according to the drawdown strategy you select on the Projection tab and
+                    whether you enabled Bed and ISA.
                 </p>
             </div>
 
@@ -52,16 +57,6 @@ export default function IncomeTaxForm({ data, setData }: Props) {
                     />
                     <p className="text-sm text-gray-500 mt-1">Income above this is taxed at 40% (2024/25: £50,270)</p>
                 </div>
-            </div>
-
-            <div className="p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded-lg">
-                <h3 className="font-semibold text-indigo-900 mb-2">Tax Optimization Strategy</h3>
-                <ul className="text-sm text-indigo-800 space-y-1">
-                    <li>• Cash assets are withdrawn first (taxable)</li>
-                    <li>• ISA funds withdrawn next up to higher rate threshold (tax-free)</li>
-                    <li>• Pension funds withdrawn after ISA is depleted (taxable)</li>
-                    <li>• Property sold last due to lower liquidity (taxable)</li>
-                </ul>
             </div>
         </div>
     )

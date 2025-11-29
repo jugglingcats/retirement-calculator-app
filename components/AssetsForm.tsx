@@ -72,6 +72,13 @@ export default function AssetsForm({ data, setData }: Props) {
 
     return (
         <div className="flex flex-col gap-8">
+            <p className="text-gray-600 text-sm">
+                Add assets that you own. Assets grow according to the rates provided in the Assumptions tab. If you are
+                in a relationship, indicate which assets belong to your partner or spouse. This will be used to
+                calculate your liabilities for each of you, and to shift assets from one partner to the other to reduce
+                tax.
+            </p>
+
             <form
                 onSubmit={addAsset}
                 className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300"
@@ -124,7 +131,7 @@ export default function AssetsForm({ data, setData }: Props) {
                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     />
                     <label htmlFor="newAssetBelongsToSpouse" className="text-sm font-medium text-gray-700">
-                        Belongs to spouse
+                        Belongs to partner
                     </label>
                 </div>
 
@@ -218,7 +225,7 @@ export default function AssetsForm({ data, setData }: Props) {
                                                     htmlFor={`editAssetBelongsToSpouse-${asset.id}`}
                                                     className="text-sm font-medium text-gray-700"
                                                 >
-                                                    Belongs to spouse
+                                                    Belongs to partner
                                                 </label>
                                             </div>
                                         </div>
