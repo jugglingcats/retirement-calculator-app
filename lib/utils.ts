@@ -34,13 +34,22 @@ export function isTaxable(category: AssetType): boolean {
         case AssetType.Cash:
             return false
         case AssetType.StocksAndShares:
-            // TODO: CGT calculation
             return false
         case AssetType.ISA:
             return false
         case AssetType.Bonds:
             return false
         case AssetType.Property:
+            return false
+    }
+}
+
+export function isCGTLiable(category: AssetType): boolean {
+    switch (category) {
+        case AssetType.StocksAndShares:
+        case AssetType.Bonds:
+            return true
+        default:
             return false
     }
 }

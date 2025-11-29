@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Asset, AssetType, RetirementData } from "@/lib/types"
+import { isCGTLiable } from "@/lib/utils"
 
 interface Props {
     data: RetirementData
@@ -14,7 +15,8 @@ export default function AssetsForm({ data, setData }: Props) {
         name: "",
         value: 0,
         category: AssetType.Pension,
-        belongsToSpouse: false
+        belongsToSpouse: false,
+        baseCost: undefined
     })
 
     const [editingId, setEditingId] = useState<string | null>(null)
@@ -36,7 +38,7 @@ export default function AssetsForm({ data, setData }: Props) {
                 ...data,
                 assets: [...data.assets, { ...newAsset, id: Date.now().toString() }]
             })
-            setNewAsset({ id: "", name: "", value: 0, category: AssetType.Pension, belongsToSpouse: false })
+            setNewAsset({ id: "", name: "", value: 0, category: AssetType.Pension, belongsToSpouse: false, baseCost: undefined })
         }
     }
 
@@ -121,6 +123,24 @@ export default function AssetsForm({ data, setData }: Props) {
                         ))}
                     </select>
                 </div>
+
+                {isCGTLiable(newAsset.category) && (
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700 text-sm">Base Cost (£)</label>
+                        <input
+                            type="number"
+                            placeholder="Original purchase cost"
+                            value={newAsset.baseCost || ""}
+                            onChange={e =>
+                                setNewAsset({ ...newAsset, baseCost: parseFloat(e.target.value) || undefined })
+                            }
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                        <p className="text-xs text-gray-500">
+                            Original cost for CGT calculation. Leave blank to assume no gain.
+                        </p>
+                    </div>
+                )}
 
                 <div className="md:col-span-3 flex items-center gap-2">
                     <input
@@ -208,6 +228,28 @@ export default function AssetsForm({ data, setData }: Props) {
                                                     ))}
                                                 </select>
                                             </div>
+                                            {isCGTLiable(displayData.category) && (
+                                                <div className="flex flex-col gap-2">
+                                                    <label className="text-sm font-medium text-gray-700">
+                                                        Base Cost (£)
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Original purchase cost"
+                                                        value={displayData.baseCost || ""}
+                                                        onChange={e =>
+                                                            setEditingData({
+                                                                ...editingData!,
+                                                                baseCost: parseFloat(e.target.value) || undefined
+                                                            })
+                                                        }
+                                                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                                    />
+                                                    <p className="text-xs text-gray-500">
+                                                        Original cost for CGT calculation.
+                                                    </p>
+                                                </div>
+                                            )}
                                             <div className="md:col-span-3 flex items-center gap-2">
                                                 <input
                                                     type="checkbox"
@@ -237,8 +279,15 @@ export default function AssetsForm({ data, setData }: Props) {
                                                     {displayData.category}
                                                 </div>
                                             </div>
-                                            <div className="font-semibold text-gray-900">
-                                                £{displayData.value.toLocaleString()}
+                                            <div className="flex flex-col gap-1">
+                                                <div className="font-semibold text-gray-900">
+                                                    £{displayData.value.toLocaleString()}
+                                                </div>
+                                                {isCGTLiable(displayData.category) && displayData.baseCost !== undefined && (
+                                                    <div className="text-sm text-gray-500">
+                                                        Base cost: £{displayData.baseCost.toLocaleString()}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
                                                 {displayData.belongsToSpouse && (

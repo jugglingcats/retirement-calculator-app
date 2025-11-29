@@ -463,16 +463,24 @@ export default function RetirementProjection({ data, setData }: Props) {
                             dataKey="taxPayable"
                             stroke="#f97316"
                             strokeWidth={2}
-                            name="Tax Payable"
+                            name="Income Tax"
                             dot={false}
                         />
                         <Line
                             type="monotone"
-                            dataKey={(d: any) => (d.expenditure || 0) + (d.taxPayable || 0)}
+                            dataKey="cgtPayable"
+                            stroke="#ec4899"
+                            strokeWidth={2}
+                            name="CGT Payable"
+                            dot={false}
+                        />
+                        <Line
+                            type="monotone"
+                            dataKey={(d: any) => (d.expenditure || 0) + (d.taxPayable || 0) + (d.cgtPayable || 0)}
                             stroke="#6b7280"
                             strokeWidth={2}
                             strokeDasharray="5 5"
-                            name="Total (Exp + Tax)"
+                            name="Total (Exp + Tax + CGT)"
                             dot={false}
                         />
                     </ComposedChart>

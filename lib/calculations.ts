@@ -1,4 +1,4 @@
-import { assetTypes, growthRateFor, isTaxable, sumAssets, sumNumbers } from "@/lib/utils"
+import { assetTypes, growthRateFor, isCGTLiable, isTaxable, sumAssets, sumNumbers } from "@/lib/utils"
 import {
     AssetPool,
     AssetPoolType,
@@ -9,12 +9,15 @@ import {
     RetirementIncome,
     YearlyDatapoint
 } from "@/lib/types"
-import { initialTaxPosition, updateTaxPosition } from "@/lib/tax"
+import { calculateCGT, CGTWithdrawal, initialTaxPosition, updateTaxPosition } from "@/lib/tax"
 import { createDrawdownStrategy } from "@/lib/strategies"
 import { applyBedAndISA } from "@/lib/annual/bedAndIsa"
 import { applyOneOffs } from "@/lib/annual/oneOffs"
 import { applyMarketShock } from "@/lib/annual/marketShock"
 import { applyGrowth } from "@/lib/annual/growth"
+
+// Type for tracking base costs of CGT-liable assets
+type BaseCostPool = Record<AssetType, number>
 
 const UK_STATE_PENSION_2024 = 11502
 const STATE_PENSION_AGE = 67
@@ -43,6 +46,33 @@ function buildAssetPools(assets: RetirementData["assets"]): [AssetPool, AssetPoo
             spouse[asset.category] += asset.value
         } else {
             primary[asset.category] += asset.value
+        }
+    }
+
+    return [primary, spouse]
+}
+
+function createEmptyBaseCostPool(): BaseCostPool {
+    return Object.fromEntries(Object.values(AssetType).map(type => [type, 0])) as BaseCostPool
+}
+
+/**
+ * Build base cost pools for CGT-liable assets.
+ * For assets without a baseCost specified, assume baseCost equals current value (no gain).
+ */
+function buildBaseCostPools(assets: RetirementData["assets"]): [BaseCostPool, BaseCostPool] {
+    const primary = createEmptyBaseCostPool()
+    const spouse = createEmptyBaseCostPool()
+
+    for (const asset of assets) {
+        if (isCGTLiable(asset.category)) {
+            // If baseCost is not specified, assume it equals current value (no gain)
+            const baseCost = asset.baseCost ?? asset.value
+            if (asset.belongsToSpouse) {
+                spouse[asset.category] += baseCost
+            } else {
+                primary[asset.category] += baseCost
+            }
         }
     }
 
@@ -112,6 +142,9 @@ export function calculateProjection(
 
     // Build separate asset maps for primary and spouse
     const assetPools = buildAssetPools(assets)
+    
+    // Build base cost pools for CGT calculation (tracks original cost basis)
+    const baseCostPools = buildBaseCostPools(assets)
 
     const spouseBirthYear = personal.spouseDateOfBirth ? new Date(personal.spouseDateOfBirth).getFullYear() : null
 
@@ -207,6 +240,41 @@ export function calculateProjection(
             pool.cash -= additionalTax
         })
 
+        // Calculate CGT for withdrawals from CGT-liable assets (stocks, bonds)
+        const cgtWithdrawalsPerPool: CGTWithdrawal[][] = assetPools.map((pool, i) => {
+            const withdrawals: CGTWithdrawal[] = []
+            for (const type of assetTypes) {
+                if (isCGTLiable(type)) {
+                    const withdrawal = startingAssets[i][type] - pool[type]
+                    if (withdrawal > 0) {
+                        // Calculate base cost ratio: what proportion of current value is original cost
+                        const currentValue = startingAssets[i][type]
+                        const baseCost = baseCostPools[i][type]
+                        const baseCostRatio = currentValue > 0 ? Math.min(1, baseCost / currentValue) : 1
+                        
+                        withdrawals.push({ withdrawal, baseCostRatio })
+                        
+                        // Update base cost pool proportionally to withdrawal
+                        // If we withdraw X% of the asset, we also "withdraw" X% of the base cost
+                        const withdrawalRatio = withdrawal / currentValue
+                        baseCostPools[i][type] -= baseCost * withdrawalRatio
+                    }
+                }
+            }
+            return withdrawals
+        })
+
+        // Calculate CGT for each person and subtract from their cash pool
+        const cgtResults = cgtWithdrawalsPerPool.map(withdrawals => 
+            calculateCGT(withdrawals, assumptions, inflationMultiplier)
+        )
+        
+        assetPools.forEach((pool, i) => {
+            pool.cash -= cgtResults[i].cgtPayable
+        })
+
+        const totalCGTPayable = sumNumbers(cgtResults.map(r => r.cgtPayable))
+
         // Combine assets for chart display
         const combinedAssets = combineAssets(assetPools)
         const currentTotalAssets = sumAssets(combinedAssets)
@@ -214,7 +282,7 @@ export function calculateProjection(
         // Compute total tax and any unmet shortfall for the year
         const totalTaxPayable = sumNumbers(taxPosition.map(p => p.tax))
         const totalWithdrawalsSum = sumNumbers(totalWithdrawals)
-        const netResourcesForSpending = baseTaxableIncome + totalWithdrawalsSum - totalTaxPayable
+        const netResourcesForSpending = baseTaxableIncome + totalWithdrawalsSum - totalTaxPayable - totalCGTPayable
         const computedShortfall = age >= retirementAge ? Math.max(0, expenditure - netResourcesForSpending) : 0
 
         yearlyData.push({
@@ -232,6 +300,7 @@ export function calculateProjection(
             statePension: sumNumbers(statePensionIncome),
             retirementIncome: sumNumbers(otherIncome),
             taxPayable: totalTaxPayable,
+            cgtPayable: totalCGTPayable,
             assetWithdrawals: totalWithdrawalsSum,
             shortfall: computedShortfall
         })

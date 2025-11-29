@@ -20,6 +20,7 @@ export interface Asset {
     value: number
     category: AssetType
     belongsToSpouse?: boolean
+    baseCost?: number // Original cost basis for CGT calculation (applicable to stocks and bonds)
 }
 
 export interface IncomeNeed {
@@ -43,6 +44,9 @@ export interface Assumptions {
         targetEquityPercentage: number // e.g., 40 means 40% equity / 60% bonds at end
         yearsToTarget: number // number of years after retirement to reach the target mix
     }
+    // Capital Gains Tax settings
+    cgtAllowance?: number // Annual CGT allowance (default £3000)
+    cgtRate?: number // CGT rate as percentage (default 18%)
 }
 
 export interface MarketShock {
@@ -117,6 +121,7 @@ export type YearlyDatapoint = {
     statePension: number
     retirementIncome: number
     taxPayable: number
+    cgtPayable: number // Capital Gains Tax payable
     assetWithdrawals: number
     shortfall?: number
 }

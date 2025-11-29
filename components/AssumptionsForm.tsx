@@ -81,6 +81,26 @@ export default function AssumptionsForm({ data, setData }: Props) {
         })
     }
 
+    const updateCGTAllowance = (value: number | undefined) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                cgtAllowance: value
+            }
+        })
+    }
+
+    const updateCGTRate = (value: number | undefined) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                cgtRate: value
+            }
+        })
+    }
+
     return (
         <div className="flex flex-col gap-8 max-w-4xl">
             <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
@@ -233,6 +253,50 @@ export default function AssumptionsForm({ data, setData }: Props) {
                             disabled={!(data.assumptions.investmentBalanceEnabled ?? true)}
                             className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
                         />
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Capital Gains Tax</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                    Configure Capital Gains Tax settings for stocks and bonds withdrawals.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">Annual CGT Allowance (£)</label>
+                        <input
+                            type="number"
+                            step="100"
+                            min={0}
+                            placeholder="3000"
+                            value={data.assumptions.cgtAllowance ?? ""}
+                            onChange={e =>
+                                updateCGTAllowance(e.target.value === "" ? undefined : parseFloat(e.target.value))
+                            }
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                        <p className="text-sm text-gray-500">
+                            Tax-free allowance for capital gains each year. Default is £3,000.
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">CGT Rate (%)</label>
+                        <input
+                            type="number"
+                            step="1"
+                            min={0}
+                            max={100}
+                            placeholder="18"
+                            value={data.assumptions.cgtRate ?? ""}
+                            onChange={e =>
+                                updateCGTRate(e.target.value === "" ? undefined : parseFloat(e.target.value))
+                            }
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                        <p className="text-sm text-gray-500">
+                            Tax rate applied to gains above the allowance. Default is 18%.
+                        </p>
                     </div>
                 </div>
             </div>
