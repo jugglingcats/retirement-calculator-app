@@ -61,9 +61,10 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
     return (
         <div className="flex flex-col gap-8">
             <p className="text-gray-600 text-sm">
-                Define your income needs at different stages of retirement. Each entry shows the annual amount needed in
-                today&apos;s money, which will be automatically adjusted for inflation. If you don&apos;t specify a
-                starting age, it will default to your retirement age.
+                Define your income needs <b>after tax</b> at different stages of retirement. Each entry shows the annual
+                amount needed in today&apos;s money net of any tax, which will be automatically adjusted for inflation.
+                If you don&apos;t specify a starting age, it will default to your retirement age. Often people's needs
+                decrease slightly as they get older.
             </p>
 
             <form

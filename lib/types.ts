@@ -29,6 +29,7 @@ export type YearlyDatapoint = {
     retirementIncome: number
     taxPayable: number
     assetWithdrawals: number
+    shortfall?: number
 }
 export type ProjectionResult = {
     yearlyData: YearlyDatapoint[]

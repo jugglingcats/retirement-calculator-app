@@ -27,10 +27,11 @@ export function applyBedAndISA(assetPools: [AssetPool, AssetPool], ages: number[
     const eligibility = [primaryEligible, spouseEligible]
 
     for (let i = 0; i < 2; i++) {
-        if (!eligibility[i]) continue
+        if (!eligibility[i]) {
+            continue
+        }
 
-        const targetISA = ANNUAL_ISA_ALLOWANCE
-        const targetCrystallisation = targetISA * crystallisationMultiplier // £80,000
+        const targetCrystallisation = ANNUAL_ISA_ALLOWANCE * crystallisationMultiplier
 
         // First, try to take from own pool
         const ownPool = assetPools[i]

@@ -400,6 +400,12 @@ export default function RetirementProjection({ data, setData }: Props) {
                             stroke="#9a3412"
                             name="Asset Drawdown"
                         />
+                        <Bar
+                            dataKey="shortfall"
+                            stackId="income"
+                            fill="#ef4444"
+                            name="Shortfall"
+                        />
                         <Line
                             type="monotone"
                             dataKey="expenditure"

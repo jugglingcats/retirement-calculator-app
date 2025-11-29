@@ -199,6 +199,12 @@ export function calculateProjection(
         const combinedAssets = combineAssets(assetPools)
         const currentTotalAssets = sumAssets(combinedAssets)
 
+        // Compute total tax and any unmet shortfall for the year
+        const totalTaxPayable = sumNumbers(taxPosition.map(p => p.tax))
+        const totalWithdrawalsSum = sumNumbers(totalWithdrawals)
+        const netResourcesForSpending = baseTaxableIncome + totalWithdrawalsSum - totalTaxPayable
+        const computedShortfall = age >= retirementAge ? Math.max(0, expenditure - netResourcesForSpending) : 0
+
         yearlyData.push({
             year,
             age,
@@ -213,8 +219,9 @@ export function calculateProjection(
             expenditure: expenditure,
             statePension: sumNumbers(statePensionIncome),
             retirementIncome: sumNumbers(otherIncome),
-            taxPayable: sumNumbers(taxPosition.map(p => p.tax)),
-            assetWithdrawals: sumNumbers(totalWithdrawals)
+            taxPayable: totalTaxPayable,
+            assetWithdrawals: totalWithdrawalsSum,
+            shortfall: computedShortfall
         })
 
         if (currentTotalAssets <= 0 && !runsOutAt && age >= retirementAge) {

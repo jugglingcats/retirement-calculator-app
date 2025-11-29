@@ -68,7 +68,7 @@ export default function RetirementCalculator() {
     const tabs = [
         { name: "Personal Info", component: PersonalInfoForm },
         { name: "Assets", component: AssetsForm },
-        { name: "Income Needs", component: IncomeNeedsForm },
+        { name: "Expenditure", component: IncomeNeedsForm },
         { name: "Retirement Income", component: RetirementIncomeForm },
         { name: "One Offs", component: OneOffsForm }, // Added One Offs tab
         { name: "Income Tax", component: IncomeTaxForm }, // Added Income Tax tab
