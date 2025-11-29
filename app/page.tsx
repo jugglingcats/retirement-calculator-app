@@ -27,7 +27,13 @@ export default function RetirementCalculator() {
         retirementIncome: [],
         assumptions: {
             inflationRate: 2.5,
-            categoryGrowthRates: {}
+            categoryGrowthRates: {},
+            investmentBalanceEnabled: true,
+            investmentBalance: {
+                initialEquityPercentage: 80,
+                targetEquityPercentage: 50,
+                yearsToTarget: 30
+            }
         },
         incomeTax: {
             personalAllowance: 12570,

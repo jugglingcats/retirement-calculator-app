@@ -43,6 +43,16 @@ export default function RetirementProjection({ data, setData }: Props) {
         })
     }
 
+    const updateInvestmentBalanceEnabled = (enabled: boolean) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                investmentBalanceEnabled: enabled
+            }
+        })
+    }
+
     // Precompute projections for all strategies so the Y-axis can use a fixed scale
     const projections = useMemo(() => {
         return {
@@ -214,6 +224,18 @@ export default function RetirementProjection({ data, setData }: Props) {
                             />
                             <label htmlFor="bedAndISAProjection" className="text-sm text-gray-700">
                                 Bed and ISA
+                            </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="investmentBalanceProjection"
+                                checked={data.assumptions.investmentBalanceEnabled ?? true}
+                                onChange={e => updateInvestmentBalanceEnabled(e.target.checked)}
+                                className="w-5 h-5 text-indigo-600 border-2 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <label htmlFor="investmentBalanceProjection" className="text-sm text-gray-700">
+                                Investment balance
                             </label>
                         </div>
                         <span className="text-sm text-gray-600">Drawdown Strategy:</span>

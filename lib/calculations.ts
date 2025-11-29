@@ -121,7 +121,7 @@ export function calculateProjection(
             applyBedAndISA(assetPools, ages)
         }
 
-        applyGrowth(assetPools, assumptions.categoryGrowthRates)
+        applyGrowth(assetPools, assumptions, age, retirementAge)
         applyOneOffs(assetPools, oneOffs, ages, inflationMultiplier)
         applyMarketShock(
             assetPools,

@@ -43,6 +43,31 @@ export default function AssumptionsForm({ data, setData }: Props) {
         })
     }
 
+    const updateInvestmentBalanceEnabled = (enabled: boolean) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                investmentBalanceEnabled: enabled
+            }
+        })
+    }
+
+    const updateInvestmentBalance = (field: "initialEquityPercentage" | "targetEquityPercentage" | "yearsToTarget", value: number) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                investmentBalance: {
+                    initialEquityPercentage: data.assumptions.investmentBalance?.initialEquityPercentage ?? 80,
+                    targetEquityPercentage: data.assumptions.investmentBalance?.targetEquityPercentage ?? 50,
+                    yearsToTarget: data.assumptions.investmentBalance?.yearsToTarget ?? 30,
+                    [field]: value
+                }
+            }
+        })
+    }
+
     return (
         <div className="flex flex-col gap-8 max-w-4xl">
             <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
@@ -102,6 +127,66 @@ export default function AssumptionsForm({ data, setData }: Props) {
                     When enabled, the projection will simulate the Bed and ISA process from age 55. Each year, up to
                     £20,000 per person is transferred tax-free from pension to ISA (25% of £80,000 crystallised).
                 </p>
+            </div>
+
+            <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Investment balance</h3>
+                <div className="flex items-center gap-3 mb-3">
+                    <input
+                        type="checkbox"
+                        id="investmentBalanceEnabled"
+                        checked={data.assumptions.investmentBalanceEnabled ?? true}
+                        onChange={e => updateInvestmentBalanceEnabled(e.target.checked)}
+                        className="w-5 h-5 text-indigo-600 border-2 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label htmlFor="investmentBalanceEnabled" className="font-semibold text-gray-700">
+                        Enable Investment balance (ISA equity/bond glide path)
+                    </label>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">Configure how ISA investments shift from equities to bonds after retirement.</p>
+                {!(data.assumptions.investmentBalanceEnabled ?? true) && (
+                    <p className="text-sm text-gray-500 mb-2">Disabled — ISA will use the Stocks growth rate without blending.</p>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">Initial equity percentage (%)</label>
+                        <input
+                            type="number"
+                            step="1"
+                            min={0}
+                            max={100}
+                            value={data.assumptions.investmentBalance?.initialEquityPercentage ?? ""}
+                            onChange={e => updateInvestmentBalance("initialEquityPercentage", parseFloat(e.target.value) || 0)}
+                            disabled={!(data.assumptions.investmentBalanceEnabled ?? true)}
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">Target equity percentage (%)</label>
+                        <input
+                            type="number"
+                            step="1"
+                            min={0}
+                            max={100}
+                            value={data.assumptions.investmentBalance?.targetEquityPercentage ?? ""}
+                            onChange={e => updateInvestmentBalance("targetEquityPercentage", parseFloat(e.target.value) || 0)}
+                            disabled={!(data.assumptions.investmentBalanceEnabled ?? true)}
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">Years to target</label>
+                        <input
+                            type="number"
+                            step="1"
+                            min={0}
+                            value={data.assumptions.investmentBalance?.yearsToTarget ?? ""}
+                            onChange={e => updateInvestmentBalance("yearsToTarget", parseInt(e.target.value) || 0)}
+                            disabled={!(data.assumptions.investmentBalanceEnabled ?? true)}
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                    </div>
+                </div>
             </div>
 
             <div className="p-6 bg-blue-50 rounded-lg border-2 border-blue-200">

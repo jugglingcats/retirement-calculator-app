@@ -35,6 +35,14 @@ export interface Assumptions {
     inflationRate: number
     categoryGrowthRates: Record<string, number>
     bedAndISAEnabled?: boolean
+    // Master toggle to enable/disable ISA investment balance glide path
+    investmentBalanceEnabled?: boolean
+    // Optional ISA investment balance glide path (equity/bond split over time)
+    investmentBalance?: {
+        initialEquityPercentage: number // e.g., 80 means 80% equity / 20% bonds at start
+        targetEquityPercentage: number // e.g., 40 means 40% equity / 60% bonds at end
+        yearsToTarget: number // number of years after retirement to reach the target mix
+    }
 }
 
 export interface MarketShock {
