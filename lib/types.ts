@@ -130,7 +130,22 @@ export type YearlyDatapoint = {
         spouse: AssetPool
         totals: { primary: number; spouse: number }
     }
+    // Per-person breakdown of the year: initial position (start-of-year asset balances),
+    // income sources, and withdrawals by asset class.
+    byPool?: {
+        primary: PoolYearBreakdown
+        spouse: PoolYearBreakdown
+    }
     shortfall?: number
+}
+
+export interface PoolYearBreakdown {
+    initialPosition: AssetPool
+    income: {
+        statePension: number
+        retirementIncome: number
+    }
+    withdrawals: AssetPool
 }
 export type ProjectionResult = {
     yearlyData: YearlyDatapoint[]

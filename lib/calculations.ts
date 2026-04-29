@@ -161,6 +161,10 @@ export function calculateProjection(
         const spouseAge = year - (spouseBirthYear || Number.NaN)
         const ages = [age, spouseAge]
 
+        // Snapshot the initial position at the very start of the year, before any
+        // growth, one-offs, shocks, or drawdown are applied.
+        const initialPosition = assetPools.map(pool => ({ ...pool }))
+
         // Bed and ISA process runs at the start of each year for eligible individuals (age 55+)
         if (assumptions.bedAndISAEnabled) {
             applyBedAndISA(assetPools, ages)
@@ -316,6 +320,24 @@ export function calculateProjection(
                 primary: withdrawalsDetailPerPool[0] || createEmptyAssetBalances(),
                 spouse: withdrawalsDetailPerPool[1] || createEmptyAssetBalances(),
                 totals: { primary: totalWithdrawals[0] || 0, spouse: totalWithdrawals[1] || 0 }
+            },
+            byPool: {
+                primary: {
+                    initialPosition: initialPosition[0] || createEmptyAssetBalances(),
+                    income: {
+                        statePension: statePensionIncome[0] || 0,
+                        retirementIncome: otherIncome[0] || 0
+                    },
+                    withdrawals: withdrawalsDetailPerPool[0] || createEmptyAssetBalances()
+                },
+                spouse: {
+                    initialPosition: initialPosition[1] || createEmptyAssetBalances(),
+                    income: {
+                        statePension: statePensionIncome[1] || 0,
+                        retirementIncome: otherIncome[1] || 0
+                    },
+                    withdrawals: withdrawalsDetailPerPool[1] || createEmptyAssetBalances()
+                }
             },
             shortfall: computedShortfall
         })
