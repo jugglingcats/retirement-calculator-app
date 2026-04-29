@@ -94,6 +94,7 @@ export type DrawdownStrategy =
     | "tax_optimized" // Use ISA to avoid higher-rate band, then taxable in fixed order
     | "lowest_growth_first" // Draw from the lowest expected growth asset first
     | "balanced" // Spread withdrawals evenly across all assets
+
 export type AssetPool = Record<AssetType, number>
 export type DrawdownStrategyType = "balanced" | "lowest_growth_first" | "tax_optimized"
 

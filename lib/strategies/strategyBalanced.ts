@@ -28,7 +28,7 @@ export class BalancedStrategy extends BaseDrawdownStrategy {
         let taxableWithdrawn = 0
 
         // Calculate proportional withdrawals
-        const withdrawals: Record<AssetType, number> = {
+        const withdrawals: AssetPool = {
             [AssetType.Cash]: 0,
             [AssetType.Pension]: 0,
             [AssetType.PensionCrystallised]: 0,

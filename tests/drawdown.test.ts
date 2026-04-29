@@ -16,7 +16,7 @@ const DEFAULT_TAX_SETTINGS: TaxSettings = {
 export function performDrawdown(
     assets: AssetPool,
     expenditure: number,
-    growthRates: Record<AssetType, number>,
+    growthRates: AssetPool,
     strategy: "lowest_growth_first" | "balanced"
 ): number {
     if (expenditure <= 0) {
@@ -39,7 +39,7 @@ export function performTaxOptimizedDrawdown(
     assets: AssetPool,
     amount: number,
     currentTaxableIncome: number,
-    growthRates: Record<AssetType, number>,
+    growthRates: AssetPool,
     taxSettings: TaxSettings,
     includeSpouse: boolean
 ): AssetDrawdownResult {
@@ -76,7 +76,7 @@ function createAssets(overrides: Partial<AssetPool> = {}): AssetPool {
     }
 }
 
-function createGrowthRates(overrides: Partial<Record<AssetType, number>> = {}): Record<AssetType, number> {
+function createGrowthRates(overrides: Partial<AssetPool> = {}): AssetPool {
     return {
         [AssetType.Pension]: 0.05,
         [AssetType.PensionCrystallised]: 0.05,

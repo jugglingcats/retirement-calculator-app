@@ -1,14 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { AssetPoolType, AssetType, PoolYear, YearlyDatapoint } from "@/lib/types"
-import {
-    addPools,
-    emptyAssetPool,
-    emptyPoolYear,
-    endPosition,
-    householdYearly,
-    householdYearlySeries,
-    sumPool
-} from "@/lib/yearlyView"
+import { addPools, emptyPoolYear, endPosition, householdYearly, householdYearlySeries, sumPool } from "@/lib/yearlyView"
+import { createEmptyAssetPool } from "@/lib/utils"
 
 function makePool(overrides: Partial<PoolYear> = {}): PoolYear {
     return {
@@ -31,7 +24,7 @@ function makeDatapoint(primary: PoolYear, spouse: PoolYear, extras: Partial<Year
 describe("yearlyView", () => {
     describe("emptyAssetPool / sumPool / addPools", () => {
         it("emptyAssetPool returns all zeros for every AssetType", () => {
-            const p = emptyAssetPool()
+            const p = createEmptyAssetPool()
             for (const t of Object.values(AssetType)) {
                 expect(p[t]).toBe(0)
             }
@@ -39,7 +32,7 @@ describe("yearlyView", () => {
         })
 
         it("sumPool sums all asset values", () => {
-            const p = emptyAssetPool()
+            const p = createEmptyAssetPool()
             p[AssetType.Cash] = 100
             p[AssetType.ISA] = 50
             p[AssetType.Pension] = 25
@@ -47,9 +40,9 @@ describe("yearlyView", () => {
         })
 
         it("addPools adds two pools field by field without mutation", () => {
-            const a = emptyAssetPool()
+            const a = createEmptyAssetPool()
             a[AssetType.Cash] = 100
-            const b = emptyAssetPool()
+            const b = createEmptyAssetPool()
             b[AssetType.Cash] = 50
             b[AssetType.ISA] = 30
 
@@ -65,12 +58,12 @@ describe("yearlyView", () => {
 
     describe("endPosition", () => {
         it("derives end-of-year balances from initialPosition - withdrawals", () => {
-            const initial = emptyAssetPool()
+            const initial = createEmptyAssetPool()
             initial[AssetType.Cash] = 1000
             initial[AssetType.ISA] = 5000
             initial[AssetType.Pension] = 10000
 
-            const withdrawals = emptyAssetPool()
+            const withdrawals = createEmptyAssetPool()
             withdrawals[AssetType.Cash] = 200
             withdrawals[AssetType.Pension] = 3000
 
@@ -83,10 +76,10 @@ describe("yearlyView", () => {
         })
 
         it("can produce negative balances when withdrawals exceed the initial position", () => {
-            const initial = emptyAssetPool()
+            const initial = createEmptyAssetPool()
             initial[AssetType.Cash] = 100
 
-            const withdrawals = emptyAssetPool()
+            const withdrawals = createEmptyAssetPool()
             withdrawals[AssetType.Cash] = 250
 
             const ep = endPosition(makePool({ initialPosition: initial, withdrawals }))
@@ -96,14 +89,14 @@ describe("yearlyView", () => {
 
     describe("householdYearly", () => {
         it("combines per-pool balances and clamps each balance at zero", () => {
-            const primaryInit = emptyAssetPool()
+            const primaryInit = createEmptyAssetPool()
             primaryInit[AssetType.Cash] = 5000
             primaryInit[AssetType.ISA] = 2000
 
-            const primaryWd = emptyAssetPool()
+            const primaryWd = createEmptyAssetPool()
             primaryWd[AssetType.Cash] = 1000
 
-            const spouseInit = emptyAssetPool()
+            const spouseInit = createEmptyAssetPool()
             spouseInit[AssetType.Cash] = 3000
             spouseInit[AssetType.ISA] = 1000
 
@@ -122,9 +115,9 @@ describe("yearlyView", () => {
         })
 
         it("clamps a single asset at zero when one pool would go negative", () => {
-            const primaryInit = emptyAssetPool()
+            const primaryInit = createEmptyAssetPool()
             primaryInit[AssetType.Cash] = 100
-            const primaryWd = emptyAssetPool()
+            const primaryWd = createEmptyAssetPool()
             primaryWd[AssetType.Cash] = 250 // cash overdrawn by 150 in primary pool
 
             const primary = makePool({ initialPosition: primaryInit, withdrawals: primaryWd })
@@ -152,12 +145,12 @@ describe("yearlyView", () => {
         })
 
         it("sums withdrawals, tax and CGT across both pools", () => {
-            const primaryWd = emptyAssetPool()
+            const primaryWd = createEmptyAssetPool()
             primaryWd[AssetType.Cash] = 200
             primaryWd[AssetType.ISA] = 100
             const primary = makePool({ withdrawals: primaryWd, tax: 50, cgtPayable: 10 })
 
-            const spouseWd = emptyAssetPool()
+            const spouseWd = createEmptyAssetPool()
             spouseWd[AssetType.Cash] = 75
             const spouse = makePool({ withdrawals: spouseWd, tax: 25, cgtPayable: 5 })
 

@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
 import { applyGrowth } from "@/lib/annual/growth"
 import { AssetPool, AssetType, Assumptions } from "@/lib/types"
 
-function makePool(values: Partial<Record<AssetType, number>>): AssetPool {
-    const base: Record<AssetType, number> = {
+function makePool(values: Partial<AssetPool>): AssetPool {
+    const base: AssetPool = {
         [AssetType.Cash]: 0,
         [AssetType.StocksAndShares]: 0,
         [AssetType.ISA]: 0,

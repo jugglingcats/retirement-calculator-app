@@ -1,4 +1,4 @@
-import { AssetPoolType, AssetType, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
+import { AssetPool, AssetPoolType, AssetType, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
 import { ASSET_LABELS, ASSET_TYPES_IN_ORDER, householdYearly, sumPool } from "@/lib/yearlyView"
 
 // Re-export the shared display helpers so callers that already import from this
@@ -13,7 +13,7 @@ export interface YearlyExportRow {
     /** 0 = primary ("me"), 1 = spouse — matches `AssetPoolType` and `YearlyDatapoint.pools`. */
     poolIndex: AssetPoolType
     personLabel: string
-    initial: Record<AssetType, number>
+    initial: AssetPool
     initialTotal: number
     statePension: number
     otherIncome: number
@@ -23,7 +23,7 @@ export interface YearlyExportRow {
     cgt: number // household CGT, only filled on primary row
     expenditureTotal: number // expenditure + tax + cgt, only filled on primary row
     netIncomeExpenditure: number // incomeTotal - expenditureTotal (primary row uses household totals)
-    withdrawals: Record<AssetType, number>
+    withdrawals: AssetPool
     withdrawalsTotal: number
 }
 

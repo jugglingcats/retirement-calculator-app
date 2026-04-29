@@ -7,9 +7,9 @@ import { sumAssets, sumNumbers } from "@/lib/utils"
  */
 export abstract class BaseDrawdownStrategy {
     protected taxSettings: TaxSettings
-    protected growthRates: Record<AssetType, number>
+    protected growthRates: AssetPool
 
-    constructor(taxSettings: TaxSettings, growthRates: Record<AssetType, number>) {
+    constructor(taxSettings: TaxSettings, growthRates: AssetPool) {
         this.taxSettings = taxSettings
         this.growthRates = growthRates
     }

@@ -1,113 +1,32 @@
-import { assetTypes, growthRateFor, isCGTLiable, isTaxable, sumNumbers } from "@/lib/utils"
+import {
+    assetTypes,
+    buildAssetPools,
+    buildBaseCgtCostPools,
+    buildOtherIncome,
+    buildStatePensions,
+    createDrawdownStrategy,
+    createEmptyAssetPool,
+    getNetExpenditure,
+    growthRateFor,
+    isCGTLiable,
+    isTaxable,
+    sumNumbers
+} from "@/lib/utils"
 import {
     AssetPool,
-    AssetPoolType,
     AssetType,
     DrawdownStrategy,
     PoolYear,
     ProjectionResult,
     RetirementData,
-    RetirementIncome,
     YearlyDatapoint
 } from "@/lib/types"
-import { emptyAssetPool, sumPool } from "@/lib/yearlyView"
+import { sumPool } from "@/lib/yearlyView"
 import { calculateCGT, CGTWithdrawal, initialTaxPosition, updateTaxPosition } from "@/lib/tax"
-import { createDrawdownStrategy } from "@/lib/strategies"
 import { applyBedAndISA } from "@/lib/annual/bedAndIsa"
 import { applyOneOffs } from "@/lib/annual/oneOffs"
 import { applyMarketShock } from "@/lib/annual/marketShock"
 import { applyGrowth } from "@/lib/annual/growth"
-
-// Type for tracking base costs of CGT-liable assets
-type BaseCostPool = Record<AssetType, number>
-
-const UK_STATE_PENSION_2024 = 11502
-const STATE_PENSION_AGE = 67
-
-function getNetExpenditure(incomeNeeds: RetirementData["incomeNeeds"], retirementAge: number, age: number) {
-    const sortedNeeds = [...incomeNeeds]
-        .map(need => ({
-            ...need,
-            effectiveStartingAge: need.startingAge ?? retirementAge
-        }))
-        .sort((a, b) => b.effectiveStartingAge - a.effectiveStartingAge)
-
-    return sortedNeeds.find(need => age >= need.effectiveStartingAge)
-}
-
-function buildAssetPools(assets: RetirementData["assets"]): [AssetPool, AssetPool] {
-    const primary = emptyAssetPool()
-    const spouse = emptyAssetPool()
-
-    for (const asset of assets) {
-        if (asset.belongsToSpouse) {
-            spouse[asset.category] += asset.value
-        } else {
-            primary[asset.category] += asset.value
-        }
-    }
-
-    return [primary, spouse]
-}
-
-function createEmptyBaseCostPool(): BaseCostPool {
-    return Object.fromEntries(Object.values(AssetType).map(type => [type, 0])) as BaseCostPool
-}
-
-/**
- * Build base cost pools for CGT-liable assets.
- * For assets without a baseCost specified, assume baseCost equals current value (no gain).
- */
-function buildBaseCostPools(assets: RetirementData["assets"]): [BaseCostPool, BaseCostPool] {
-    const primary = createEmptyBaseCostPool()
-    const spouse = createEmptyBaseCostPool()
-
-    for (const asset of assets) {
-        if (isCGTLiable(asset.category)) {
-            // If baseCost is not specified, assume it equals current value (no gain)
-            const baseCost = asset.baseCost ?? asset.value
-            if (asset.belongsToSpouse) {
-                spouse[asset.category] += baseCost
-            } else {
-                primary[asset.category] += baseCost
-            }
-        }
-    }
-
-    return [primary, spouse]
-}
-
-function buildStatePensions(age: number, spouseAge: number, inflationMultiplier: number): number[] {
-    // Calculate state pension per person
-    return [
-        age >= STATE_PENSION_AGE ? UK_STATE_PENSION_2024 : 0,
-        spouseAge >= STATE_PENSION_AGE ? UK_STATE_PENSION_2024 : 0
-    ].map(v => v * inflationMultiplier)
-}
-
-function buildOtherIncome(incomeSources: RetirementIncome[], year: number, inflationMultiplier: number): number[] {
-    if (!incomeSources) {
-        return [0, 0]
-    }
-    return incomeSources.reduce(
-        (acc, income) => {
-            if (income.enabled && year >= income.startYear && (!income.endYear || year <= income.endYear)) {
-                const growthRate = income.growthRate || 0
-                const inflation_multiplier = income.inflationAdjusted ? inflationMultiplier : 1
-                const growth_multiplier = Math.pow(1 + growthRate / 100, year - income.startYear)
-                const amount = income.annualAmount * inflation_multiplier * growth_multiplier
-
-                if (income.belongsToSpouse) {
-                    acc[AssetPoolType.SPOUSE] += amount
-                } else {
-                    acc[AssetPoolType.PRIMARY] += amount
-                }
-            }
-            return acc
-        },
-        [0, 0]
-    )
-}
 
 export function calculateProjection(
     data: RetirementData,
@@ -132,7 +51,7 @@ export function calculateProjection(
     const assetPools = buildAssetPools(assets)
 
     // Build base cost pools for CGT calculation (tracks original cost basis)
-    const baseCostPools = buildBaseCostPools(assets)
+    const baseCostPools = buildBaseCgtCostPools(assets)
 
     const spouseBirthYear = personal.spouseDateOfBirth ? new Date(personal.spouseDateOfBirth).getFullYear() : null
 
@@ -165,7 +84,7 @@ export function calculateProjection(
         // drawdown strategy sees. End-of-year balances are derived as
         //   endPosition[t] = initialPosition[t] - withdrawals[t]
         // (cash spent on tax/CGT is already reflected in `withdrawals.cash`).
-        const initialPosition: [AssetPool, AssetPool] = [{ ...assetPools[0] }, { ...assetPools[1] }]
+        const initialPosition: AssetPool[] = assetPools.map(a => ({ ...a }))
 
         const statePensionIncome = buildStatePensions(age, spouseAge, inflationMultiplier)
         const otherIncome = buildOtherIncome(retirementIncome, year, inflationMultiplier)
@@ -203,7 +122,7 @@ export function calculateProjection(
             if (shortfall > 0) {
                 const growthRates = Object.fromEntries(
                     Object.values(AssetType).map(type => [type, growthRateFor(assumptions.categoryGrowthRates, type)])
-                ) as Record<AssetType, number>
+                ) as AssetPool
 
                 const strategyInstance = createDrawdownStrategy(strategy, incomeTax, growthRates)
                 strategyInstance.execute(assetPools, shortfall, taxPosition)
@@ -214,7 +133,7 @@ export function calculateProjection(
         // At this point cash has already been debited for the drawdown itself but not yet
         // for income tax / CGT — those are folded in below so that the final withdrawal map
         // equals `initialPosition - endingBalances` exactly.
-        const withdrawalsDetailPerPool: [AssetPool, AssetPool] = [emptyAssetPool(), emptyAssetPool()]
+        const withdrawalsDetailPerPool: [AssetPool, AssetPool] = [createEmptyAssetPool(), createEmptyAssetPool()]
         for (let i = 0; i < 2; i++) {
             for (const type of assetTypes) {
                 const diff = initialPosition[i][type] - assetPools[i][type]

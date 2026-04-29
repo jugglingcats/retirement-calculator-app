@@ -1,4 +1,5 @@
 import { AssetPool, AssetPoolType, AssetType, PoolYear, YearlyDatapoint } from "@/lib/types"
+import { createEmptyAssetPool } from "@/lib/utils"
 
 /**
  * Display order of asset types in the breakdown table, Excel export and chart legend.
@@ -25,16 +26,12 @@ export const ASSET_LABELS: Record<AssetType, string> = {
     [AssetType.Property]: "Property"
 }
 
-export function emptyAssetPool(): AssetPool {
-    return Object.fromEntries(Object.values(AssetType).map(t => [t, 0])) as AssetPool
-}
-
 export function sumPool(p: AssetPool): number {
     return Object.values(AssetType).reduce((s, t) => s + (p[t] || 0), 0)
 }
 
 export function addPools(a: AssetPool, b: AssetPool): AssetPool {
-    const out = emptyAssetPool()
+    const out = createEmptyAssetPool()
     for (const t of Object.values(AssetType)) out[t] = (a[t] || 0) + (b[t] || 0)
     return out
 }
@@ -42,9 +39,9 @@ export function addPools(a: AssetPool, b: AssetPool): AssetPool {
 /** An empty `PoolYear`, used as the spouse pool when no spouse is configured. */
 export function emptyPoolYear(): PoolYear {
     return {
-        initialPosition: emptyAssetPool(),
+        initialPosition: createEmptyAssetPool(),
         income: { statePension: 0, otherIncome: 0 },
-        withdrawals: emptyAssetPool(),
+        withdrawals: createEmptyAssetPool(),
         tax: 0,
         cgtPayable: 0
     }
@@ -56,7 +53,7 @@ export function emptyPoolYear(): PoolYear {
  * is a faithful end-of-year snapshot per asset type.
  */
 export function endPosition(p: PoolYear): AssetPool {
-    const out = emptyAssetPool()
+    const out = createEmptyAssetPool()
     for (const t of Object.values(AssetType)) {
         out[t] = (p.initialPosition[t] || 0) - (p.withdrawals[t] || 0)
     }

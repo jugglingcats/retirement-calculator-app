@@ -13,7 +13,7 @@ import ShocksForm from "@/components/ShocksForm"
 import OneOffsForm from "@/components/OneOffsForm"
 import RetirementProjection from "@/components/RetirementProjection"
 
-import { exportSettings, readSettingsFile } from "@/lib/settingsIO"
+import { exportSettings, readSettingsFile } from "@/lib/settings-json"
 import { useRetirementData } from "@/hooks/useRetirementData"
 
 interface TabDef {
