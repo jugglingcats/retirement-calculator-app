@@ -1,0 +1,129 @@
+{
+  "personal": {
+    "dateOfBirth": "1969-06-29",
+    "spouseDateOfBirth": "1970-02-12",
+    "retirementAge": 57
+  },
+  "assets": [
+    {
+      "id": "1777449305633",
+      "name": "AVIVA pension",
+      "value": 407000,
+      "category": "pension",
+      "belongsToSpouse": false
+    },
+    {
+      "id": "1777449316507",
+      "name": "Glowbuzzer pension",
+      "value": 250000,
+      "category": "pension",
+      "belongsToSpouse": false
+    },
+    {
+      "id": "1777449363586",
+      "name": "Vanguard ISA",
+      "value": 131000,
+      "category": "isa",
+      "belongsToSpouse": false
+    },
+    {
+      "id": "1777449386227",
+      "name": "Hargreaves Landsdown",
+      "value": 9300,
+      "category": "isa",
+      "belongsToSpouse": false
+    },
+    {
+      "id": "1777449409878",
+      "name": "Rathbones",
+      "value": 155000,
+      "category": "isa",
+      "belongsToSpouse": false
+    }
+  ],
+  "incomeNeeds": [
+    {
+      "id": "1777449447095",
+      "description": "Post retirement",
+      "annualAmount": 60000
+    }
+  ],
+  "retirementIncome": [
+    {
+      "id": "1777449541772",
+      "description": "Caro pension",
+      "annualAmount": 4500,
+      "startYear": 2036,
+      "enabled": true,
+      "inflationAdjusted": true,
+      "belongsToSpouse": true
+    },
+    {
+      "id": "1777449577943",
+      "description": "Backgammon Hub",
+      "annualAmount": 20000,
+      "startYear": 2026,
+      "endYear": 2040,
+      "enabled": true,
+      "inflationAdjusted": true,
+      "belongsToSpouse": false
+    }
+  ],
+  "assumptions": {
+    "inflationRate": 2,
+    "categoryGrowthRates": {
+      "pension": 4,
+      "stocks": 5,
+      "property": 3,
+      "bonds": 2,
+      "cash": 0,
+      "other": 2
+    },
+    "investmentBalanceEnabled": false,
+    "investmentBalance": {
+      "initialEquityPercentage": 80,
+      "targetEquityPercentage": 20,
+      "yearsToTarget": 25
+    },
+    "cgtRate": 20,
+    "bedAndISAEnabled": true
+  },
+  "incomeTax": {
+    "personalAllowance": 12570,
+    "higherRateThreshold": 50270
+  },
+  "shocks": [
+    {
+      "id": "1777450191242",
+      "year": 2030,
+      "impactPercent": -15,
+      "description": ""
+    }
+  ],
+  "oneOffs": [
+    {
+      "description": "Inheritance (Caro)",
+      "amount": 300000,
+      "age": 65,
+      "enabled": false,
+      "belongsToSpouse": true,
+      "id": "1777449605502"
+    },
+    {
+      "description": "Inheritance (Alfie)",
+      "amount": 200000,
+      "age": 65,
+      "enabled": false,
+      "belongsToSpouse": false,
+      "id": "1777449616713"
+    },
+    {
+      "description": "Gift to kids",
+      "amount": -200000,
+      "age": 65,
+      "enabled": false,
+      "belongsToSpouse": false,
+      "id": "1777450247080"
+    }
+  ]
+}

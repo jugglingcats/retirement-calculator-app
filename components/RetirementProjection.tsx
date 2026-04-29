@@ -145,14 +145,18 @@ export default function RetirementProjection({ data, setData }: Props) {
     const primaryHasPension = useMemo(
         () =>
             data.assets.some(
-                a => !a.belongsToSpouse && (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
+                a =>
+                    !a.belongsToSpouse &&
+                    (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
             ),
         [data.assets]
     )
     const spouseHasPension = useMemo(
         () =>
             data.assets.some(
-                a => a.belongsToSpouse && (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
+                a =>
+                    a.belongsToSpouse &&
+                    (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
             ),
         [data.assets]
     )
@@ -534,7 +538,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                             <tr className="bg-gray-50 text-gray-700">
                                 <th className="text-left px-3 py-2 border-b">Year</th>
                                 <th className="text-right px-3 py-2 border-b">Me</th>
-                                <th className="text-right px-3 py-2 border-b">Wife</th>
+                                <th className="text-right px-3 py-2 border-b">Partner</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -583,8 +587,12 @@ export default function RetirementProjection({ data, setData }: Props) {
                                                                 </tr>
                                                             ))}
                                                             <tr>
-                                                                <td className="pr-2 pt-1 text-gray-500 text-xs text-right">Total</td>
-                                                                <td className="pt-1 text-right tabular-nums text-xs text-gray-500">{formatGBP3(meTotal)}</td>
+                                                                <td className="pr-2 pt-1 text-gray-500 text-xs text-right">
+                                                                    Total
+                                                                </td>
+                                                                <td className="pt-1 text-right tabular-nums text-xs text-gray-500">
+                                                                    {formatGBP3(meTotal)}
+                                                                </td>
                                                             </tr>
                                                         </tbody>
                                                     </table>
@@ -609,8 +617,12 @@ export default function RetirementProjection({ data, setData }: Props) {
                                                                 </tr>
                                                             ))}
                                                             <tr>
-                                                                <td className="pr-2 pt-1 text-gray-500 text-xs text-right">Total</td>
-                                                                <td className="pt-1 text-right tabular-nums text-xs text-gray-500">{formatGBP3(wifeTotal)}</td>
+                                                                <td className="pr-2 pt-1 text-gray-500 text-xs text-right">
+                                                                    Total
+                                                                </td>
+                                                                <td className="pt-1 text-right tabular-nums text-xs text-gray-500">
+                                                                    {formatGBP3(wifeTotal)}
+                                                                </td>
                                                             </tr>
                                                         </tbody>
                                                     </table>
@@ -624,7 +636,8 @@ export default function RetirementProjection({ data, setData }: Props) {
                     </table>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                    Each cell shows a breakdown of asset types with non-zero withdrawals for that year (values to 3 significant figures).
+                    Each cell shows a breakdown of asset types with non-zero withdrawals for that year (values to 3
+                    significant figures).
                 </p>
             </div>
         </div>
