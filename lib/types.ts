@@ -54,6 +54,7 @@ export interface MarketShock {
     year: number
     impactPercent: number
     description?: string
+    enabled?: boolean
 }
 
 export interface RetirementIncome {

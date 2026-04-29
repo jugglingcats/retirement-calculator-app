@@ -142,7 +142,7 @@ export function calculateProjection(
 
     // Build separate asset maps for primary and spouse
     const assetPools = buildAssetPools(assets)
-    
+
     // Build base cost pools for CGT calculation (tracks original cost basis)
     const baseCostPools = buildBaseCostPools(assets)
 
@@ -170,7 +170,7 @@ export function calculateProjection(
         applyOneOffs(assetPools, oneOffs, ages, inflationMultiplier)
         applyMarketShock(
             assetPools,
-            shocks.find(s => s.year === year)
+            shocks.find(s => s.year === year && s.enabled !== false)
         )
 
         const statePensionIncome = buildStatePensions(age, spouseAge, inflationMultiplier)
@@ -261,9 +261,9 @@ export function calculateProjection(
                         const currentValue = startingAssets[i][type]
                         const baseCost = baseCostPools[i][type]
                         const baseCostRatio = currentValue > 0 ? Math.min(1, baseCost / currentValue) : 1
-                        
+
                         withdrawals.push({ withdrawal, baseCostRatio })
-                        
+
                         // Update base cost pool proportionally to withdrawal
                         // If we withdraw X% of the asset, we also "withdraw" X% of the base cost
                         const withdrawalRatio = withdrawal / currentValue
@@ -275,10 +275,10 @@ export function calculateProjection(
         })
 
         // Calculate CGT for each person and subtract from their cash pool
-        const cgtResults = cgtWithdrawalsPerPool.map(withdrawals => 
+        const cgtResults = cgtWithdrawalsPerPool.map(withdrawals =>
             calculateCGT(withdrawals, assumptions, inflationMultiplier)
         )
-        
+
         assetPools.forEach((pool, i) => {
             pool.cash -= cgtResults[i].cgtPayable
         })

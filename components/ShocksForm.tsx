@@ -9,27 +9,64 @@ interface Props {
 }
 
 export default function ShocksForm({ data, setData }: Props) {
-    const [newShock, setNewShock] = useState<MarketShock>({
-        id: "",
+    const [newShock, setNewShock] = useState<Omit<MarketShock, "id">>({
         year: new Date().getFullYear() + 1,
         impactPercent: -20,
-        description: ""
+        description: "",
+        enabled: true
     })
+
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editingData, setEditingData] = useState<MarketShock | null>(null)
 
     const addShock = (e: React.FormEvent) => {
         e.preventDefault()
         if (newShock.year && newShock.impactPercent !== 0) {
+            const shockToAdd: MarketShock = {
+                ...newShock,
+                id: Date.now().toString()
+            }
             setData({
                 ...data,
-                shocks: [...data.shocks, { ...newShock, id: Date.now().toString() }]
+                shocks: [...data.shocks, shockToAdd]
             })
             setNewShock({
-                id: "",
                 year: new Date().getFullYear() + 1,
                 impactPercent: -20,
-                description: ""
+                description: "",
+                enabled: true
             })
         }
+    }
+
+    const startEditing = (shock: MarketShock) => {
+        setEditingId(shock.id)
+        setEditingData({ ...shock })
+    }
+
+    const cancelEditing = () => {
+        setEditingId(null)
+        setEditingData(null)
+    }
+
+    const saveEditing = () => {
+        if (editingData) {
+            setData({
+                ...data,
+                shocks: data.shocks.map(shock => (shock.id === editingId ? editingData : shock))
+            })
+            setEditingId(null)
+            setEditingData(null)
+        }
+    }
+
+    const handleToggleEnabled = (id: string) => {
+        setData({
+            ...data,
+            shocks: data.shocks.map(shock =>
+                shock.id === id ? { ...shock, enabled: shock.enabled === false ? true : false } : shock
+            )
+        })
     }
 
     const deleteShock = (id: string) => {
@@ -97,29 +134,123 @@ export default function ShocksForm({ data, setData }: Props) {
 
             {data.shocks.length > 0 && (
                 <div className="flex flex-col gap-4">
-                    {data.shocks.map(shock => (
-                        <div
-                            key={shock.id}
-                            className="p-6 bg-white border-2 border-red-200 rounded-lg hover:border-red-400 transition-colors grid grid-cols-1 md:grid-cols-4 gap-4 items-center"
-                        >
-                            <div className="flex flex-col gap-1 md:col-span-2">
-                                <div className="font-semibold text-gray-900">{shock.description || "Market Event"}</div>
-                                <div className="text-sm text-gray-500">Year: {shock.year}</div>
-                            </div>
+                    {data.shocks.map(shock => {
+                        const isEditing = editingId === shock.id
+                        const displayData = isEditing ? editingData! : shock
+                        const isEnabled = shock.enabled !== false
+
+                        return (
                             <div
-                                className={`font-semibold ${shock.impactPercent > 0 ? "text-green-600" : "text-red-600"}`}
+                                key={shock.id}
+                                className={`p-6 border-2 rounded-lg transition-colors ${
+                                    isEnabled
+                                        ? "bg-white border-red-200 hover:border-red-400"
+                                        : "bg-gray-100 border-gray-300 opacity-60"
+                                }`}
                             >
-                                {shock.impactPercent > 0 ? "+" : ""}
-                                {shock.impactPercent}%
+                                {isEditing ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-sm font-medium text-gray-700">Description</label>
+                                            <input
+                                                type="text"
+                                                value={displayData.description || ""}
+                                                onChange={e =>
+                                                    setEditingData({ ...editingData!, description: e.target.value })
+                                                }
+                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-sm font-medium text-gray-700">Impact (%)</label>
+                                            <input
+                                                type="number"
+                                                step="1"
+                                                value={displayData.impactPercent}
+                                                onChange={e =>
+                                                    setEditingData({
+                                                        ...editingData!,
+                                                        impactPercent: parseFloat(e.target.value) || 0
+                                                    })
+                                                }
+                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-sm font-medium text-gray-700">Year</label>
+                                            <input
+                                                type="number"
+                                                value={displayData.year}
+                                                onChange={e =>
+                                                    setEditingData({
+                                                        ...editingData!,
+                                                        year: parseInt(e.target.value) || displayData.year
+                                                    })
+                                                }
+                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={isEnabled}
+                                                onChange={() => handleToggleEnabled(shock.id)}
+                                                className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 rounded"
+                                            />
+                                            <div className="font-semibold text-gray-900">
+                                                {displayData.description || "Market Event"}
+                                            </div>
+                                        </div>
+                                        <div
+                                            className={`font-semibold ${displayData.impactPercent > 0 ? "text-green-600" : "text-red-600"}`}
+                                        >
+                                            {displayData.impactPercent > 0 ? "+" : ""}
+                                            {displayData.impactPercent}%
+                                        </div>
+                                        <div className="text-gray-700">In {displayData.year}</div>
+                                        <div />
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2">
+                                    {isEditing ? (
+                                        <>
+                                            <button
+                                                onClick={saveEditing}
+                                                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors font-semibold text-sm"
+                                            >
+                                                Save
+                                            </button>
+                                            <button
+                                                onClick={cancelEditing}
+                                                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-semibold text-sm"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => startEditing(shock)}
+                                                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-semibold text-sm"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => deleteShock(shock.id)}
+                                                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-semibold text-sm"
+                                            >
+                                                Delete
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                            <button
-                                onClick={() => deleteShock(shock.id)}
-                                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-semibold text-sm"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             )}
         </div>

@@ -14,8 +14,11 @@ import {
     YAxis
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AssetType, DrawdownStrategy, RetirementData } from "@/lib/types"
+
+const STRATEGY_STORAGE_KEY = "retirement-calculator-drawdown-strategy"
+const VALID_STRATEGIES: DrawdownStrategy[] = ["balanced", "lowest_growth_first", "tax_optimized"]
 
 interface Props {
     data: RetirementData
@@ -23,7 +26,26 @@ interface Props {
 }
 
 export default function RetirementProjection({ data, setData }: Props) {
-    const [strategy, setStrategy] = useState<DrawdownStrategy>("balanced")
+    const [strategy, setStrategy] = useState<DrawdownStrategy>(() => {
+        if (typeof window === "undefined") return "balanced"
+        try {
+            const saved = window.localStorage.getItem(STRATEGY_STORAGE_KEY)
+            if (saved && VALID_STRATEGIES.includes(saved as DrawdownStrategy)) {
+                return saved as DrawdownStrategy
+            }
+        } catch (error) {
+            console.error("Failed to read drawdown strategy from localStorage:", error)
+        }
+        return "balanced"
+    })
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(STRATEGY_STORAGE_KEY, strategy)
+        } catch (error) {
+            console.error("Failed to save drawdown strategy to localStorage:", error)
+        }
+    }, [strategy])
 
     if (!data.personal.dateOfBirth || data.assets.length === 0) {
         return (
