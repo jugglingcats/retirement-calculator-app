@@ -221,8 +221,18 @@ export function calculateProjection(
             }
         }
 
-        const totalWithdrawals = assetPools.map((pool, i) => {
-            return assetTypes.reduce((sum, type) => sum + startingAssets[i][type] - pool[type], 0)
+        // Compute withdrawals by pool and by asset class (positive reductions only)
+        const withdrawalsDetailPerPool = assetPools.map((pool, i) => {
+            const detail: AssetPool = createEmptyAssetBalances()
+            for (const type of assetTypes) {
+                const diff = startingAssets[i][type] - pool[type]
+                detail[type] = diff > 0 ? diff : 0
+            }
+            return detail
+        })
+
+        const totalWithdrawals = withdrawalsDetailPerPool.map(detail => {
+            return assetTypes.reduce((sum, type) => sum + (detail[type] || 0), 0)
         })
 
         const taxableWithdrawals = assetPools.map((pool, i) => {
@@ -302,6 +312,11 @@ export function calculateProjection(
             taxPayable: totalTaxPayable,
             cgtPayable: totalCGTPayable,
             assetWithdrawals: totalWithdrawalsSum,
+            withdrawalsByPool: {
+                primary: withdrawalsDetailPerPool[0] || createEmptyAssetBalances(),
+                spouse: withdrawalsDetailPerPool[1] || createEmptyAssetBalances(),
+                totals: { primary: totalWithdrawals[0] || 0, spouse: totalWithdrawals[1] || 0 }
+            },
             shortfall: computedShortfall
         })
 

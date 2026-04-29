@@ -15,7 +15,7 @@ import {
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
 import { useMemo, useState } from "react"
-import { DrawdownStrategy, RetirementData } from "@/lib/types"
+import { AssetType, DrawdownStrategy, RetirementData } from "@/lib/types"
 
 interface Props {
     data: RetirementData
@@ -118,6 +118,44 @@ export default function RetirementProjection({ data, setData }: Props) {
         const rounded = Math.round(abs / scale) * scale
         return `£${sign}${Math.trunc(rounded).toLocaleString()}`
     }
+
+    const formatGBP3 = (value: number) => formatGBP(value, 3)
+
+    // Display order and labels for asset types in nested withdrawal tables
+    const assetDisplayOrder: AssetType[] = [
+        AssetType.Cash,
+        AssetType.ISA,
+        AssetType.StocksAndShares,
+        AssetType.Bonds,
+        AssetType.PensionCrystallised,
+        AssetType.Pension,
+        AssetType.Property
+    ]
+    const assetLabels: Record<AssetType, string> = {
+        [AssetType.Cash]: "Cash",
+        [AssetType.ISA]: "ISAs",
+        [AssetType.StocksAndShares]: "Stocks",
+        [AssetType.Bonds]: "Bonds",
+        [AssetType.PensionCrystallised]: "Pension (crystallised)",
+        [AssetType.Pension]: "Pension",
+        [AssetType.Property]: "Property"
+    }
+
+    // Determine if each person actually has any pension assets; if not, suppress pension line items
+    const primaryHasPension = useMemo(
+        () =>
+            data.assets.some(
+                a => !a.belongsToSpouse && (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
+            ),
+        [data.assets]
+    )
+    const spouseHasPension = useMemo(
+        () =>
+            data.assets.some(
+                a => a.belongsToSpouse && (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
+            ),
+        [data.assets]
+    )
 
     // Custom tooltip for the Asset Projection chart so we can include Total assets
     const AssetTooltip = ({ active, payload, label }: any) => {
@@ -485,6 +523,109 @@ export default function RetirementProjection({ data, setData }: Props) {
                         />
                     </ComposedChart>
                 </ResponsiveContainer>
+            </div>
+
+            {/* Withdrawals table per year and per asset pool with per-asset breakdowns */}
+            <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Withdrawals by Asset Pool</h3>
+                <div className="overflow-auto">
+                    <table className="min-w-full text-sm border-collapse">
+                        <thead>
+                            <tr className="bg-gray-50 text-gray-700">
+                                <th className="text-left px-3 py-2 border-b">Year</th>
+                                <th className="text-right px-3 py-2 border-b">Me</th>
+                                <th className="text-right px-3 py-2 border-b">Wife</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {yearlyData.map(row => {
+                                const detailPrimary = row.withdrawalsByPool?.primary
+                                const detailSpouse = row.withdrawalsByPool?.spouse
+                                const totals = row.withdrawalsByPool?.totals
+                                const meTotal = totals?.primary ?? 0
+                                const wifeTotal = totals?.spouse ?? 0
+
+                                const primaryOrder = primaryHasPension
+                                    ? assetDisplayOrder
+                                    : assetDisplayOrder.filter(
+                                          t => t !== AssetType.Pension && t !== AssetType.PensionCrystallised
+                                      )
+                                const spouseOrder = spouseHasPension
+                                    ? assetDisplayOrder
+                                    : assetDisplayOrder.filter(
+                                          t => t !== AssetType.Pension && t !== AssetType.PensionCrystallised
+                                      )
+
+                                const primaryEntries = primaryOrder
+                                    .map(type => ({ type, value: detailPrimary ? detailPrimary[type] || 0 : 0 }))
+                                    .filter(e => e.value > 0)
+                                const spouseEntries = spouseOrder
+                                    .map(type => ({ type, value: detailSpouse ? detailSpouse[type] || 0 : 0 }))
+                                    .filter(e => e.value > 0)
+                                return (
+                                    <tr key={row.year} className="odd:bg-white even:bg-gray-50">
+                                        <td className="px-3 py-2 border-b text-gray-800">{row.year}</td>
+                                        <td className="px-3 py-2 border-b align-top text-right">
+                                            {primaryEntries.length === 0 ? (
+                                                <span className="text-gray-400">—</span>
+                                            ) : (
+                                                <div className="ml-auto inline-block min-w-[180px] text-right">
+                                                    <table className="w-full">
+                                                        <tbody>
+                                                            {primaryEntries.map(entry => (
+                                                                <tr key={`p-${row.year}-${entry.type}`}>
+                                                                    <td className="pr-2 py-0.5 text-gray-700 whitespace-nowrap text-right">
+                                                                        {assetLabels[entry.type as AssetType]}
+                                                                    </td>
+                                                                    <td className="py-0.5 text-right tabular-nums whitespace-nowrap">
+                                                                        {formatGBP3(entry.value)}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                            <tr>
+                                                                <td className="pr-2 pt-1 text-gray-500 text-xs text-right">Total</td>
+                                                                <td className="pt-1 text-right tabular-nums text-xs text-gray-500">{formatGBP3(meTotal)}</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2 border-b align-top text-right">
+                                            {spouseEntries.length === 0 ? (
+                                                <span className="text-gray-400">—</span>
+                                            ) : (
+                                                <div className="ml-auto inline-block min-w-[180px] text-right">
+                                                    <table className="w-full">
+                                                        <tbody>
+                                                            {spouseEntries.map(entry => (
+                                                                <tr key={`s-${row.year}-${entry.type}`}>
+                                                                    <td className="pr-2 py-0.5 text-gray-700 whitespace-nowrap text-right">
+                                                                        {assetLabels[entry.type as AssetType]}
+                                                                    </td>
+                                                                    <td className="py-0.5 text-right tabular-nums whitespace-nowrap">
+                                                                        {formatGBP3(entry.value)}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                            <tr>
+                                                                <td className="pr-2 pt-1 text-gray-500 text-xs text-right">Total</td>
+                                                                <td className="pt-1 text-right tabular-nums text-xs text-gray-500">{formatGBP3(wifeTotal)}</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                    Each cell shows a breakdown of asset types with non-zero withdrawals for that year (values to 3 significant figures).
+                </p>
             </div>
         </div>
     )

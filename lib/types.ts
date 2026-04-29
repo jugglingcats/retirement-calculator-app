@@ -123,6 +123,12 @@ export type YearlyDatapoint = {
     taxPayable: number
     cgtPayable: number // Capital Gains Tax payable
     assetWithdrawals: number
+    // Detailed withdrawals by pool and asset class for the given year
+    withdrawalsByPool?: {
+        primary: AssetPool
+        spouse: AssetPool
+        totals: { primary: number; spouse: number }
+    }
     shortfall?: number
 }
 export type ProjectionResult = {
