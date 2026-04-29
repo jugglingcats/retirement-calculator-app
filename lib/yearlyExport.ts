@@ -1,16 +1,22 @@
-import { AssetType, PoolYearBreakdown, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
+import { AssetPoolType, AssetType, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
+import { ASSET_LABELS, ASSET_TYPES_IN_ORDER, householdYearly, sumPool } from "@/lib/yearlyView"
 
-export type PoolKey = "primary" | "spouse"
+// Re-export the shared display helpers so callers that already import from this
+// file keep working. New code should import them directly from `lib/yearlyView`.
+export { ASSET_LABELS, ASSET_TYPES_IN_ORDER }
+/** @deprecated Import `ASSET_TYPES_IN_ORDER` from `@/lib/yearlyView` instead. */
+export const ASSET_DISPLAY_ORDER = ASSET_TYPES_IN_ORDER
 
 export interface YearlyExportRow {
     year: number
     age: number
-    pool: PoolKey
+    /** 0 = primary ("me"), 1 = spouse — matches `AssetPoolType` and `YearlyDatapoint.pools`. */
+    poolIndex: AssetPoolType
     personLabel: string
     initial: Record<AssetType, number>
     initialTotal: number
     statePension: number
-    retirementIncome: number
+    otherIncome: number
     incomeTotal: number
     expenditure: number // household value, only filled on primary row
     tax: number // household income tax, only filled on primary row
@@ -29,41 +35,42 @@ export interface YearlyExportTable {
     hasSpouse: boolean
 }
 
-export const ASSET_DISPLAY_ORDER: AssetType[] = [
-    AssetType.Cash,
-    AssetType.ISA,
-    AssetType.StocksAndShares,
-    AssetType.Bonds,
-    AssetType.PensionCrystallised,
-    AssetType.Pension,
-    AssetType.Property
-]
+const POOL_INDICES: AssetPoolType[] = [AssetPoolType.PRIMARY, AssetPoolType.SPOUSE]
 
-export const ASSET_LABELS: Record<AssetType, string> = {
-    [AssetType.Cash]: "Cash",
-    [AssetType.ISA]: "ISAs",
-    [AssetType.StocksAndShares]: "Stocks",
-    [AssetType.Bonds]: "Bonds",
-    [AssetType.PensionCrystallised]: "Pension (crystallised)",
-    [AssetType.Pension]: "Pension",
-    [AssetType.Property]: "Property"
-}
+function buildRow(yd: YearlyDatapoint, poolIndex: AssetPoolType): YearlyExportRow {
+    const p = yd.pools[poolIndex]
+    const isPrimary = poolIndex === AssetPoolType.PRIMARY
 
-function emptyAssetMap(): Record<AssetType, number> {
-    return Object.fromEntries(Object.values(AssetType).map(t => [t, 0])) as Record<AssetType, number>
-}
+    const initial = p.initialPosition
+    const initialTotal = sumPool(initial)
+    const withdrawals = p.withdrawals
+    const withdrawalsTotal = sumPool(withdrawals)
+    const incomeTotal = (p.income.statePension || 0) + (p.income.otherIncome || 0)
 
-function sumAssetMap(m: Record<AssetType, number>): number {
-    return Object.values(m).reduce((s, v) => s + (v || 0), 0)
-}
+    const hh = householdYearly(yd)
+    const expenditure = isPrimary ? hh.expenditure : 0
+    const tax = isPrimary ? hh.taxPayable : 0
+    const cgt = isPrimary ? hh.cgtPayable : 0
+    const expenditureTotal = expenditure + tax + cgt
+    const netIncomeExpenditure = isPrimary ? hh.income - expenditureTotal : 0
 
-function poolBreakdown(yd: YearlyDatapoint, pool: PoolKey): PoolYearBreakdown {
-    const bp = yd.byPool?.[pool]
-    if (bp) return bp
     return {
-        initialPosition: emptyAssetMap(),
-        income: { statePension: 0, retirementIncome: 0 },
-        withdrawals: emptyAssetMap()
+        year: yd.year,
+        age: yd.age,
+        poolIndex,
+        personLabel: isPrimary ? "Me" : "Partner",
+        initial,
+        initialTotal,
+        statePension: p.income.statePension || 0,
+        otherIncome: p.income.otherIncome || 0,
+        incomeTotal,
+        expenditure,
+        tax,
+        cgt,
+        expenditureTotal,
+        netIncomeExpenditure,
+        withdrawals,
+        withdrawalsTotal
     }
 }
 
@@ -76,54 +83,24 @@ export function buildYearlyExportTable(data: RetirementData, projection: Project
 
     const rows: YearlyExportRow[] = []
     for (const yd of projection.yearlyData) {
-        for (const pool of ["primary", "spouse"] as PoolKey[]) {
-            const bp = poolBreakdown(yd, pool)
-            const initialTotal = sumAssetMap(bp.initialPosition)
-            const withdrawalsTotal = sumAssetMap(bp.withdrawals)
-            const incomeTotal = (bp.income.statePension || 0) + (bp.income.retirementIncome || 0)
+        for (const poolIndex of POOL_INDICES) {
+            const row = buildRow(yd, poolIndex)
             // Skip spouse rows entirely if the user has no partner configured and there's nothing to show.
-            if (pool === "spouse" && !hasSpouse && initialTotal === 0 && withdrawalsTotal === 0 && incomeTotal === 0) {
+            if (
+                poolIndex === AssetPoolType.SPOUSE &&
+                !hasSpouse &&
+                row.initialTotal === 0 &&
+                row.withdrawalsTotal === 0 &&
+                row.incomeTotal === 0
+            ) {
                 continue
             }
-            const isPrimary = pool === "primary"
-            const expenditure = isPrimary ? yd.expenditure || 0 : 0
-            const tax = isPrimary ? yd.taxPayable || 0 : 0
-            const cgt = isPrimary ? yd.cgtPayable || 0 : 0
-            const expenditureTotal = expenditure + tax + cgt
-            // Net income vs expenditure uses the household-level income total on the primary row
-            // and 0 on the spouse row to avoid double-counting.
-            const householdIncomeTotal = isPrimary
-                ? (yd.byPool?.primary
-                      ? (yd.byPool.primary.income.statePension || 0) + (yd.byPool.primary.income.retirementIncome || 0)
-                      : 0) +
-                  (yd.byPool?.spouse
-                      ? (yd.byPool.spouse.income.statePension || 0) + (yd.byPool.spouse.income.retirementIncome || 0)
-                      : 0)
-                : 0
-            const netIncomeExpenditure = isPrimary ? householdIncomeTotal - expenditureTotal : 0
-            rows.push({
-                year: yd.year,
-                age: pool === "primary" ? yd.age : yd.age, // age column reflects the row's person
-                pool,
-                personLabel: pool === "primary" ? "Me" : "Partner",
-                initial: bp.initialPosition,
-                initialTotal,
-                statePension: bp.income.statePension || 0,
-                retirementIncome: bp.income.retirementIncome || 0,
-                incomeTotal,
-                expenditure,
-                tax,
-                cgt,
-                expenditureTotal,
-                netIncomeExpenditure,
-                withdrawals: bp.withdrawals,
-                withdrawalsTotal
-            })
+            rows.push(row)
         }
     }
 
     // Determine which asset types ever carry a non-zero value in initial position or withdrawals.
-    const visibleAssetTypes = ASSET_DISPLAY_ORDER.filter(type =>
+    const visibleAssetTypes = ASSET_TYPES_IN_ORDER.filter(type =>
         rows.some(r => (r.initial[type] || 0) !== 0 || (r.withdrawals[type] || 0) !== 0)
     )
 

@@ -1,14 +1,16 @@
-import { assetTypes, growthRateFor, isCGTLiable, isTaxable, sumAssets, sumNumbers } from "@/lib/utils"
+import { assetTypes, growthRateFor, isCGTLiable, isTaxable, sumNumbers } from "@/lib/utils"
 import {
     AssetPool,
     AssetPoolType,
     AssetType,
     DrawdownStrategy,
+    PoolYear,
     ProjectionResult,
     RetirementData,
     RetirementIncome,
     YearlyDatapoint
 } from "@/lib/types"
+import { emptyAssetPool, sumPool } from "@/lib/yearlyView"
 import { calculateCGT, CGTWithdrawal, initialTaxPosition, updateTaxPosition } from "@/lib/tax"
 import { createDrawdownStrategy } from "@/lib/strategies"
 import { applyBedAndISA } from "@/lib/annual/bedAndIsa"
@@ -33,13 +35,9 @@ function getNetExpenditure(incomeNeeds: RetirementData["incomeNeeds"], retiremen
     return sortedNeeds.find(need => age >= need.effectiveStartingAge)
 }
 
-function createEmptyAssetBalances(): AssetPool {
-    return Object.fromEntries(Object.values(AssetType).map(type => [type, 0])) as AssetPool
-}
-
 function buildAssetPools(assets: RetirementData["assets"]): [AssetPool, AssetPool] {
-    const primary = createEmptyAssetBalances()
-    const spouse = createEmptyAssetBalances()
+    const primary = emptyAssetPool()
+    const spouse = emptyAssetPool()
 
     for (const asset of assets) {
         if (asset.belongsToSpouse) {
@@ -87,7 +85,7 @@ function buildStatePensions(age: number, spouseAge: number, inflationMultiplier:
     ].map(v => v * inflationMultiplier)
 }
 
-function buildRetirementIncome(incomeSources: RetirementIncome[], year: number, inflationMultiplier: number): number[] {
+function buildOtherIncome(incomeSources: RetirementIncome[], year: number, inflationMultiplier: number): number[] {
     if (!incomeSources) {
         return [0, 0]
     }
@@ -109,16 +107,6 @@ function buildRetirementIncome(incomeSources: RetirementIncome[], year: number, 
         },
         [0, 0]
     )
-}
-
-function combineAssets(pools: AssetPool[]): AssetPool {
-    const combined = createEmptyAssetBalances()
-    for (const pool of pools) {
-        for (const type of Object.values(AssetType)) {
-            combined[type] += pool[type]
-        }
-    }
-    return combined
 }
 
 export function calculateProjection(
@@ -161,10 +149,6 @@ export function calculateProjection(
         const spouseAge = year - (spouseBirthYear || Number.NaN)
         const ages = [age, spouseAge]
 
-        // Snapshot the initial position at the very start of the year, before any
-        // growth, one-offs, shocks, or drawdown are applied.
-        const initialPosition = assetPools.map(pool => ({ ...pool }))
-
         // Bed and ISA process runs at the start of each year for eligible individuals (age 55+)
         if (assumptions.bedAndISAEnabled) {
             applyBedAndISA(assetPools, ages)
@@ -177,8 +161,14 @@ export function calculateProjection(
             shocks.find(s => s.year === year && s.enabled !== false)
         )
 
+        // Snapshot the post-growth, pre-drawdown position. This is the position the
+        // drawdown strategy sees. End-of-year balances are derived as
+        //   endPosition[t] = initialPosition[t] - withdrawals[t]
+        // (cash spent on tax/CGT is already reflected in `withdrawals.cash`).
+        const initialPosition: [AssetPool, AssetPool] = [{ ...assetPools[0] }, { ...assetPools[1] }]
+
         const statePensionIncome = buildStatePensions(age, spouseAge, inflationMultiplier)
-        const otherIncome = buildRetirementIncome(retirementIncome, year, inflationMultiplier)
+        const otherIncome = buildOtherIncome(retirementIncome, year, inflationMultiplier)
 
         const taxableIncome = statePensionIncome.map((pension, i) => pension + otherIncome[i])
 
@@ -195,8 +185,7 @@ export function calculateProjection(
 
         const taxPosition = taxableIncome.map(_ => initialTaxPosition(incomeTax, taxBandMultiplier))
         taxPosition.forEach((p, i) => {
-            const income = taxableIncome[i]
-            taxPosition[i] = updateTaxPosition(income, p)
+            taxPosition[i] = updateTaxPosition(taxableIncome[i], p)
         })
 
         const initialTaxLiability = taxPosition.map(p => p.tax)
@@ -206,10 +195,6 @@ export function calculateProjection(
             // Ensure cash pool non-negative (negative cash is added to shortfall)
             pool.cash = Math.max(0, pool.cash)
         })
-
-        const startingAssets = assetPools.map(pool => ({
-            ...pool
-        }))
 
         if (age >= retirementAge) {
             // Initial tax liability is handled in `execute` method, so just include the initial cash liability here
@@ -225,33 +210,34 @@ export function calculateProjection(
             }
         }
 
-        // Compute withdrawals by pool and by asset class (positive reductions only)
-        const withdrawalsDetailPerPool = assetPools.map((pool, i) => {
-            const detail: AssetPool = createEmptyAssetBalances()
+        // Compute withdrawals by pool and by asset class (positive reductions only).
+        // At this point cash has already been debited for the drawdown itself but not yet
+        // for income tax / CGT — those are folded in below so that the final withdrawal map
+        // equals `initialPosition - endingBalances` exactly.
+        const withdrawalsDetailPerPool: [AssetPool, AssetPool] = [emptyAssetPool(), emptyAssetPool()]
+        for (let i = 0; i < 2; i++) {
             for (const type of assetTypes) {
-                const diff = startingAssets[i][type] - pool[type]
-                detail[type] = diff > 0 ? diff : 0
+                const diff = initialPosition[i][type] - assetPools[i][type]
+                withdrawalsDetailPerPool[i][type] = diff > 0 ? diff : 0
             }
-            return detail
-        })
-
-        const totalWithdrawals = withdrawalsDetailPerPool.map(detail => {
-            return assetTypes.reduce((sum, type) => sum + (detail[type] || 0), 0)
-        })
+        }
 
         const taxableWithdrawals = assetPools.map((pool, i) => {
             return assetTypes
                 .filter(type => isTaxable(type))
-                .reduce((sum, type) => sum + startingAssets[i][type] - pool[type], 0)
+                .reduce((sum, type) => sum + initialPosition[i][type] - pool[type], 0)
         })
 
         taxableWithdrawals.forEach((taxable, i) => {
             taxPosition[i] = updateTaxPosition(taxable, taxPosition[i])
         })
 
+        // Settle additional income tax (over what was implicitly paid during drawdown)
+        // out of cash, and reflect it in the recorded cash withdrawal.
         assetPools.forEach((pool, i) => {
             const additionalTax = taxPosition[i].tax - initialTaxLiability[i]
             pool.cash -= additionalTax
+            withdrawalsDetailPerPool[i].cash += additionalTax
         })
 
         // Calculate CGT for withdrawals from CGT-liable assets (stocks, bonds)
@@ -259,10 +245,10 @@ export function calculateProjection(
             const withdrawals: CGTWithdrawal[] = []
             for (const type of assetTypes) {
                 if (isCGTLiable(type)) {
-                    const withdrawal = startingAssets[i][type] - pool[type]
+                    const withdrawal = initialPosition[i][type] - pool[type]
                     if (withdrawal > 0) {
                         // Calculate base cost ratio: what proportion of current value is original cost
-                        const currentValue = startingAssets[i][type]
+                        const currentValue = initialPosition[i][type]
                         const baseCost = baseCostPools[i][type]
                         const baseCostRatio = currentValue > 0 ? Math.min(1, baseCost / currentValue) : 1
 
@@ -284,61 +270,49 @@ export function calculateProjection(
         )
 
         assetPools.forEach((pool, i) => {
-            pool.cash -= cgtResults[i].cgtPayable
+            const cgtPayable = cgtResults[i].cgtPayable
+            pool.cash -= cgtPayable
+            withdrawalsDetailPerPool[i].cash += cgtPayable
         })
 
-        const totalCGTPayable = sumNumbers(cgtResults.map(r => r.cgtPayable))
+        // Build the per-pool record. End-of-year balances are *not* stored: they can be
+        // recovered as `initialPosition - withdrawals`.
+        const pools: [PoolYear, PoolYear] = [
+            {
+                initialPosition: initialPosition[0],
+                income: {
+                    statePension: statePensionIncome[0] || 0,
+                    otherIncome: otherIncome[0] || 0
+                },
+                withdrawals: withdrawalsDetailPerPool[0],
+                tax: taxPosition[0].tax,
+                cgtPayable: cgtResults[0].cgtPayable
+            },
+            {
+                initialPosition: initialPosition[1],
+                income: {
+                    statePension: statePensionIncome[1] || 0,
+                    otherIncome: otherIncome[1] || 0
+                },
+                withdrawals: withdrawalsDetailPerPool[1],
+                tax: taxPosition[1].tax,
+                cgtPayable: cgtResults[1].cgtPayable
+            }
+        ]
 
-        // Combine assets for chart display
-        const combinedAssets = combineAssets(assetPools)
-        const currentTotalAssets = sumAssets(combinedAssets)
-
-        // Compute total tax and any unmet shortfall for the year
-        const totalTaxPayable = sumNumbers(taxPosition.map(p => p.tax))
-        const totalWithdrawalsSum = sumNumbers(totalWithdrawals)
+        // Compute end-of-year total assets and any unmet shortfall for the year.
+        const currentTotalAssets = assetPools.reduce((sum, pool) => sum + sumPool(pool), 0)
+        const totalTaxPayable = taxPosition[0].tax + taxPosition[1].tax
+        const totalCGTPayable = cgtResults[0].cgtPayable + cgtResults[1].cgtPayable
+        const totalWithdrawalsSum = sumPool(withdrawalsDetailPerPool[0]) + sumPool(withdrawalsDetailPerPool[1])
         const netResourcesForSpending = baseTaxableIncome + totalWithdrawalsSum - totalTaxPayable - totalCGTPayable
         const computedShortfall = age >= retirementAge ? Math.max(0, expenditure - netResourcesForSpending) : 0
 
         yearlyData.push({
             year,
             age,
-            assets: Math.max(0, currentTotalAssets),
-            cash: Math.max(0, combinedAssets.cash),
-            stocks: Math.max(0, combinedAssets.stocks),
-            isa: Math.max(0, combinedAssets.isa),
-            pension: Math.max(0, combinedAssets.pension),
-            pensionCrystallised: Math.max(0, combinedAssets.pensionCrystallised),
-            property: Math.max(0, combinedAssets.property),
-            income: baseTaxableIncome,
-            expenditure: expenditure,
-            statePension: sumNumbers(statePensionIncome),
-            retirementIncome: sumNumbers(otherIncome),
-            taxPayable: totalTaxPayable,
-            cgtPayable: totalCGTPayable,
-            assetWithdrawals: totalWithdrawalsSum,
-            withdrawalsByPool: {
-                primary: withdrawalsDetailPerPool[0] || createEmptyAssetBalances(),
-                spouse: withdrawalsDetailPerPool[1] || createEmptyAssetBalances(),
-                totals: { primary: totalWithdrawals[0] || 0, spouse: totalWithdrawals[1] || 0 }
-            },
-            byPool: {
-                primary: {
-                    initialPosition: initialPosition[0] || createEmptyAssetBalances(),
-                    income: {
-                        statePension: statePensionIncome[0] || 0,
-                        retirementIncome: otherIncome[0] || 0
-                    },
-                    withdrawals: withdrawalsDetailPerPool[0] || createEmptyAssetBalances()
-                },
-                spouse: {
-                    initialPosition: initialPosition[1] || createEmptyAssetBalances(),
-                    income: {
-                        statePension: statePensionIncome[1] || 0,
-                        retirementIncome: otherIncome[1] || 0
-                    },
-                    withdrawals: withdrawalsDetailPerPool[1] || createEmptyAssetBalances()
-                }
-            },
+            pools,
+            expenditure,
             shortfall: computedShortfall
         })
 

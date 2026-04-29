@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest"
 import { calculateProjection } from "@/lib/calculations"
-import { AssetType, RetirementData } from "@/lib/types"
+import { AssetType, RetirementData, YearlyDatapoint } from "@/lib/types"
+import { householdYearly } from "@/lib/yearlyView"
+
+// Convenience: flatten a per-pool `YearlyDatapoint` into the household-level
+// snapshot so tests can keep asserting on simple flat fields.
+const hh = (yd: YearlyDatapoint) => householdYearly(yd)
 
 function baseData(overrides: Partial<RetirementData> = {}): RetirementData {
     const current = new Date()
@@ -76,7 +81,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Pension should remain unchanged (shown as combined pension in chart)
             expect(firstYear.pension).toBe(100000)
@@ -98,7 +103,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Should crystallise £80,000: £20,000 to ISA, £60,000 to pensionCrystallised
             // Uncrystallised pension = 100000 - 80000 = 20000
@@ -126,7 +131,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // £80,000 crystallised: £20,000 (25%) to ISA, £60,000 (75%) to pensionCrystallised
             // Remaining uncrystallised pension: 200000 - 80000 = 120000
@@ -153,7 +158,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // All £40,000 crystallised: £10,000 (25%) to ISA, £30,000 (75%) to pensionCrystallised
             // Uncrystallised pension: 0
@@ -179,7 +184,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             expect(firstYear.pension).toBe(0)
             expect(firstYear.isa).toBe(5000)
@@ -209,7 +214,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Both crystallise £80,000 each
             // Primary: 100000 - 80000 = 20000 uncrystallised, 60000 crystallised
@@ -244,7 +249,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Only spouse crystallises £80,000
             // Primary pension unchanged: 100000 uncrystallised
@@ -281,7 +286,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Primary has £40,000, needs £80,000, so takes £40,000 from spouse's pension
             // Primary: crystallises own £40,000 + £40,000 from spouse = £80,000
@@ -315,7 +320,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Primary crystallises £80,000 from own pension
             // Spouse has £0, takes £80,000 from primary's remaining pension (200000 - 80000 = 120000)
@@ -351,7 +356,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Primary: has £30,000, takes £30,000 from spouse = £60,000 crystallised
             //   -> £15,000 to ISA, £45,000 to pensionCrystallised
@@ -380,27 +385,30 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 3)
+            const y0 = hh(result.yearlyData[0])
+            const y1 = hh(result.yearlyData[1])
+            const y2 = hh(result.yearlyData[2])
 
             // Year 1 (age 55): crystallise £80,000
             // Uncrystallised: 200000 - 80000 = 120000, Crystallised: 60000
-            expect(result.yearlyData[0].pension + result.yearlyData[0].pensionCrystallised).toBe(180000)
-            expect(result.yearlyData[0].pension).toBe(120000)
-            expect(result.yearlyData[0].pensionCrystallised).toBe(60000)
-            expect(result.yearlyData[0].isa).toBe(20000)
+            expect(y0.pension + y0.pensionCrystallised).toBe(180000)
+            expect(y0.pension).toBe(120000)
+            expect(y0.pensionCrystallised).toBe(60000)
+            expect(y0.isa).toBe(20000)
 
             // Year 2 (age 56): crystallise another £80,000
             // Uncrystallised: 120000 - 80000 = 40000, Crystallised: 60000 + 60000 = 120000
-            expect(result.yearlyData[1].pension + result.yearlyData[1].pensionCrystallised).toBe(160000)
-            expect(result.yearlyData[1].pension).toBe(40000)
-            expect(result.yearlyData[1].pensionCrystallised).toBe(120000)
-            expect(result.yearlyData[1].isa).toBe(40000)
+            expect(y1.pension + y1.pensionCrystallised).toBe(160000)
+            expect(y1.pension).toBe(40000)
+            expect(y1.pensionCrystallised).toBe(120000)
+            expect(y1.isa).toBe(40000)
 
             // Year 3 (age 57): only £40,000 uncrystallised pension remains
             // Uncrystallised: 0, Crystallised: 120000 + 30000 = 150000
-            expect(result.yearlyData[2].pension + result.yearlyData[2].pensionCrystallised).toBe(150000)
-            expect(result.yearlyData[2].pension).toBe(0)
-            expect(result.yearlyData[2].pensionCrystallised).toBe(150000)
-            expect(result.yearlyData[2].isa).toBe(50000)
+            expect(y2.pension + y2.pensionCrystallised).toBe(150000)
+            expect(y2.pension).toBe(0)
+            expect(y2.pensionCrystallised).toBe(150000)
+            expect(y2.isa).toBe(50000)
         })
 
         it("stops crystallising when all pension is crystallised", () => {
@@ -417,25 +425,28 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 3)
+            const y0 = hh(result.yearlyData[0])
+            const y1 = hh(result.yearlyData[1])
+            const y2 = hh(result.yearlyData[2])
 
             // Year 1: crystallise all £80,000
             // Uncrystallised: 0, Crystallised: 60000
-            expect(result.yearlyData[0].pension + result.yearlyData[0].pensionCrystallised).toBe(60000)
-            expect(result.yearlyData[0].pension).toBe(0)
-            expect(result.yearlyData[0].pensionCrystallised).toBe(60000)
-            expect(result.yearlyData[0].isa).toBe(20000)
+            expect(y0.pension + y0.pensionCrystallised).toBe(60000)
+            expect(y0.pension).toBe(0)
+            expect(y0.pensionCrystallised).toBe(60000)
+            expect(y0.isa).toBe(20000)
 
             // Year 2: no uncrystallised pension left, nothing happens
-            expect(result.yearlyData[1].pension + result.yearlyData[1].pensionCrystallised).toBe(60000)
-            expect(result.yearlyData[1].pension).toBe(0)
-            expect(result.yearlyData[1].pensionCrystallised).toBe(60000)
-            expect(result.yearlyData[1].isa).toBe(20000)
+            expect(y1.pension + y1.pensionCrystallised).toBe(60000)
+            expect(y1.pension).toBe(0)
+            expect(y1.pensionCrystallised).toBe(60000)
+            expect(y1.isa).toBe(20000)
 
             // Year 3: still nothing to crystallise
-            expect(result.yearlyData[2].pension + result.yearlyData[2].pensionCrystallised).toBe(60000)
-            expect(result.yearlyData[2].pension).toBe(0)
-            expect(result.yearlyData[2].pensionCrystallised).toBe(60000)
-            expect(result.yearlyData[2].isa).toBe(20000)
+            expect(y2.pension + y2.pensionCrystallised).toBe(60000)
+            expect(y2.pension).toBe(0)
+            expect(y2.pensionCrystallised).toBe(60000)
+            expect(y2.isa).toBe(20000)
         })
     })
 
@@ -455,7 +466,7 @@ describe("Bed and ISA", () => {
             })
 
             const result = calculateProjection(data, 1)
-            const firstYear = result.yearlyData[0]
+            const firstYear = hh(result.yearlyData[0])
 
             // Total assets should remain 175000
             // Uncrystallised pension: 100000 - 80000 = 20000

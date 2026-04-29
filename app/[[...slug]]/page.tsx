@@ -1,91 +1,61 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { use, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import PersonalInfoForm from "@/components/PersonalInfoForm"
 import AssetsForm from "@/components/AssetsForm"
 import IncomeNeedsForm from "@/components/IncomeNeedsForm"
 import RetirementIncomeForm from "@/components/RetirementIncomeForm"
-import IncomeTaxForm from "@/components/IncomeTaxForm" // Import IncomeTaxForm component
+import IncomeTaxForm from "@/components/IncomeTaxForm"
 import AssumptionsForm from "@/components/AssumptionsForm"
 import ShocksForm from "@/components/ShocksForm"
-import OneOffsForm from "@/components/OneOffsForm" // Import OneOffsForm component
+import OneOffsForm from "@/components/OneOffsForm"
 import RetirementProjection from "@/components/RetirementProjection"
 
-import { RetirementData } from "@/lib/types"
 import { exportSettings, readSettingsFile } from "@/lib/settingsIO"
+import { useRetirementData } from "@/hooks/useRetirementData"
 
-const STORAGE_KEY = "retirement-calculator-data"
+interface TabDef {
+    slug: string
+    name: string
+    component: React.ComponentType<any>
+}
 
-export default function RetirementCalculator() {
-    const [activeTab, setActiveTab] = useState(0)
-    const [data, setData] = useState<RetirementData>({
-        personal: {
-            dateOfBirth: "",
-            spouseDateOfBirth: "",
-            retirementAge: 65
-        },
-        assets: [],
-        incomeNeeds: [],
-        retirementIncome: [],
-        assumptions: {
-            inflationRate: 2.5,
-            categoryGrowthRates: {},
-            investmentBalanceEnabled: true,
-            investmentBalance: {
-                initialEquityPercentage: 80,
-                targetEquityPercentage: 50,
-                yearsToTarget: 30
-            }
-        },
-        incomeTax: {
-            personalAllowance: 12570,
-            higherRateThreshold: 50270
-        }, // Added default income tax settings
-        shocks: [],
-        oneOffs: []
-    })
+const tabs: TabDef[] = [
+    { slug: "personal-info", name: "Personal Info", component: PersonalInfoForm },
+    { slug: "assets", name: "Assets", component: AssetsForm },
+    { slug: "expenditure", name: "Expenditure", component: IncomeNeedsForm },
+    { slug: "retirement-income", name: "Retirement Income", component: RetirementIncomeForm },
+    { slug: "one-offs", name: "One Offs", component: OneOffsForm },
+    { slug: "income-tax", name: "Income Tax", component: IncomeTaxForm },
+    { slug: "assumptions", name: "Assumptions", component: AssumptionsForm },
+    { slug: "market-shocks", name: "Market Shocks", component: ShocksForm },
+    { slug: "projection", name: "Projection", component: RetirementProjection }
+]
+
+const DEFAULT_SLUG = tabs[0].slug
+
+export default function CalculatorPage({ params }: { params: Promise<{ slug?: string[] }> }) {
+    const router = useRouter()
+    const { slug: slugSegments } = use(params)
+    const slug = slugSegments?.[0]
+    // If the URL is unrecognised (or root), fall back to the default tab. We render the
+    // default tab immediately for a smooth experience, and replace the URL so deep-links
+    // and refreshes work cleanly.
+    const matchedTab = tabs.find(t => t.slug === slug)
+    const activeTab = matchedTab ?? tabs[0]
 
     useEffect(() => {
-        const savedData = localStorage.getItem(STORAGE_KEY)
-        if (savedData) {
-            try {
-                const parsedData = JSON.parse(savedData)
-                if (!parsedData.retirementIncome) {
-                    parsedData.retirementIncome = []
-                }
-                if (!parsedData.oneOffs) {
-                    parsedData.oneOffs = []
-                }
-                if (!parsedData.incomeTax) {
-                    parsedData.incomeTax = {
-                        personalAllowance: 12570,
-                        higherRateThreshold: 50270
-                    }
-                }
-                setData(parsedData)
-            } catch (error) {
-                console.error("Failed to parse saved data:", error)
-            }
+        if (!slug) {
+            router.replace(`/${DEFAULT_SLUG}`)
+        } else if (!matchedTab) {
+            router.replace(`/${DEFAULT_SLUG}`)
         }
-    }, [])
+    }, [slug, matchedTab, router])
 
-    useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    }, [data])
-
-    const tabs = [
-        { name: "Personal Info", component: PersonalInfoForm },
-        { name: "Assets", component: AssetsForm },
-        { name: "Expenditure", component: IncomeNeedsForm },
-        { name: "Retirement Income", component: RetirementIncomeForm },
-        { name: "One Offs", component: OneOffsForm }, // Added One Offs tab
-        { name: "Income Tax", component: IncomeTaxForm }, // Added Income Tax tab
-        { name: "Assumptions", component: AssumptionsForm },
-        { name: "Market Shocks", component: ShocksForm },
-        { name: "Projection", component: RetirementProjection }
-    ]
-
-    const CurrentTabComponent = tabs[activeTab].component
+    const [data, setData] = useRetirementData()
+    const CurrentTabComponent = activeTab.component
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [menuOpen, setMenuOpen] = useState(false)
@@ -200,19 +170,22 @@ export default function RetirementCalculator() {
 
                 <div className="p-4 md:p-8">
                     <div className="flex flex-wrap gap-2 border-b-2 border-gray-200 mb-6">
-                        {tabs.map((tab, index) => (
-                            <button
-                                key={tab.name}
-                                onClick={() => setActiveTab(index)}
-                                className={`px-4 py-3 font-semibold transition-all rounded-t-lg ${
-                                    activeTab === index
-                                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
-                                        : "text-gray-600 hover:bg-gray-100"
-                                }`}
-                            >
-                                {tab.name}
-                            </button>
-                        ))}
+                        {tabs.map(tab => {
+                            const isActive = tab.slug === activeTab.slug
+                            return (
+                                <Link
+                                    key={tab.slug}
+                                    href={`/${tab.slug}`}
+                                    className={`px-4 py-3 font-semibold transition-all rounded-t-lg ${
+                                        isActive
+                                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                                            : "text-gray-600 hover:bg-gray-100"
+                                    }`}
+                                >
+                                    {tab.name}
+                                </Link>
+                            )
+                        })}
                     </div>
 
                     <div className="animate-in fade-in duration-300">

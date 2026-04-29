@@ -107,45 +107,50 @@ export interface AssetDrawdownResult {
     taxableWithdrawn: number
 }
 
-export type YearlyDatapoint = {
-    year: number
-    age: number
-    assets: number
-    cash: number
-    stocks: number
-    isa: number
-    pension: number
-    pensionCrystallised: number
-    property: number
-    income: number
-    expenditure: number
-    statePension: number
-    retirementIncome: number
-    taxPayable: number
-    cgtPayable: number // Capital Gains Tax payable
-    assetWithdrawals: number
-    // Detailed withdrawals by pool and asset class for the given year
-    withdrawalsByPool?: {
-        primary: AssetPool
-        spouse: AssetPool
-        totals: { primary: number; spouse: number }
-    }
-    // Per-person breakdown of the year: initial position (start-of-year asset balances),
-    // income sources, and withdrawals by asset class.
-    byPool?: {
-        primary: PoolYearBreakdown
-        spouse: PoolYearBreakdown
-    }
-    shortfall?: number
-}
-
-export interface PoolYearBreakdown {
+/**
+ * Single per-person view of one simulated year.
+ *
+ * `initialPosition` captures the per-person asset balances *after* start-of-year
+ * carry-over, bed&ISA, growth, one-offs and market shocks have been applied —
+ * i.e. the position the drawdown strategy sees. End-of-year balances are
+ * intentionally not stored: they are derived as
+ *   endPosition[t] = initialPosition[t] - withdrawals[t]
+ * since cash spent on income tax and CGT is already reflected in
+ * `withdrawals.cash`.
+ */
+export interface PoolYear {
     initialPosition: AssetPool
     income: {
         statePension: number
-        retirementIncome: number
+        // Non-state pension income (e.g. DB pensions, salary). Previously called
+        // `retirementIncome` in the projection output.
+        otherIncome: number
     }
+    // Positive reductions only. `withdrawals.cash` includes cash spent on
+    // income tax and CGT for this person.
     withdrawals: AssetPool
+    // Income tax payable by this person.
+    tax: number
+    // Capital Gains Tax payable by this person.
+    cgtPayable: number
+}
+
+/**
+ * One simulated year of the household projection.
+ *
+ * The per-pool record is the single source of truth: household-level numbers
+ * (combined balances, totals, etc.) are derived in `lib/yearlyView.ts` via
+ * `householdYearly`. Index 0 is the primary ("me"), index 1 is the spouse and
+ * is always present (an "empty" `PoolYear` when no spouse is configured).
+ */
+export type YearlyDatapoint = {
+    year: number
+    age: number
+    pools: [PoolYear, PoolYear]
+    // Household target spending for the year (after inflation).
+    expenditure: number
+    // Unmet expenditure for the year, when assets and income are insufficient.
+    shortfall: number
 }
 export type ProjectionResult = {
     yearlyData: YearlyDatapoint[]

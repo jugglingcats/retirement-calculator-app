@@ -15,9 +15,10 @@ import {
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
 import { useEffect, useMemo, useState } from "react"
-import { AssetType, DrawdownStrategy, RetirementData } from "@/lib/types"
-import { ASSET_LABELS, buildYearlyExportTable } from "@/lib/yearlyExport"
-import { downloadYearlyExcel } from "@/lib/yearlyExcelExport"
+import { DrawdownStrategy, RetirementData } from "@/lib/types"
+import { HouseholdYearly, householdYearlySeries } from "@/lib/yearlyView"
+import YearlyBreakdownSection from "@/components/YearlyBreakdownSection"
+import { formatGBP } from "@/components/util"
 
 const STRATEGY_STORAGE_KEY = "retirement-calculator-drawdown-strategy"
 const VALID_STRATEGIES: DrawdownStrategy[] = ["balanced", "lowest_growth_first", "tax_optimized"]
@@ -49,14 +50,6 @@ export default function RetirementProjection({ data, setData }: Props) {
         }
     }, [strategy])
 
-    if (!data.personal.dateOfBirth || data.assets.length === 0) {
-        return (
-            <div className="p-8 bg-gray-100 rounded-lg text-center text-gray-600">
-                Please complete the Personal Info, Assets, and Income Needs sections to see your retirement projection.
-            </div>
-        )
-    }
-
     const updateBedAndISA = (enabled: boolean) => {
         setData({
             ...data,
@@ -77,21 +70,41 @@ export default function RetirementProjection({ data, setData }: Props) {
         })
     }
 
-    // Precompute projections for all strategies so the Y-axis can use a fixed scale
+    // Precompute projections for all strategies so the Y-axis can use a fixed scale.
+    // Guarded by the same condition as the early return below so we don't run a real
+    // simulation before the user has entered enough data; we still call the hook
+    // unconditionally to satisfy the Rules of Hooks.
+    const hasMinimumData = Boolean(data.personal.dateOfBirth) && data.assets.length > 0
     const projections = useMemo(() => {
+        if (!hasMinimumData) {
+            const empty = { yearlyData: [], runsOutAt: null, currentAssets: 0 } as unknown as ReturnType<
+                typeof calculateProjection
+            >
+            return {
+                balanced: empty,
+                lowest_growth_first: empty,
+                tax_optimized: empty
+            } as Record<DrawdownStrategy, ReturnType<typeof calculateProjection>>
+        }
         return {
             balanced: calculateProjection(data, Infinity, "balanced"),
             lowest_growth_first: calculateProjection(data, Infinity, "lowest_growth_first"),
             tax_optimized: calculateProjection(data, Infinity, "tax_optimized")
         } as Record<DrawdownStrategy, ReturnType<typeof calculateProjection>>
-    }, [data])
+    }, [data, hasMinimumData])
 
     // Use the currently selected strategy's results for most UI elements
     const { yearlyData, runsOutAt, currentAssets } = projections[strategy]
 
+    // Household-level series derived from the per-pool simulation output. This is what
+    // the charts and the asset tooltip read from â€” `yearlyData` itself only carries the
+    // per-pool record now.
+    const householdSeries = useMemo(() => householdYearlySeries(yearlyData), [yearlyData])
+
     // Compute the fixed Y-axis max as the largest total assets across all strategies and years
     const fixedYAxisMax = useMemo(() => {
-        const maxFrom = (arr: typeof yearlyData) => (arr.length ? Math.max(...arr.map(d => d.assets || 0)) : 0)
+        const maxFrom = (yds: typeof yearlyData) =>
+            yds.length ? Math.max(...householdYearlySeries(yds).map(h => h.assets || 0)) : 0
         const m1 = maxFrom(projections.balanced.yearlyData)
         const m2 = maxFrom(projections.lowest_growth_first.yearlyData)
         const m3 = maxFrom(projections.tax_optimized.yearlyData)
@@ -131,72 +144,26 @@ export default function RetirementProjection({ data, setData }: Props) {
         danger: "from-red-500 to-red-600"
     }
 
-    // Format currency to 5 significant figures with thousand separators
-    const formatGBP = (value: number, sig = 5) => {
-        if (!isFinite(value) || value === 0) return "£0"
-        const sign = value < 0 ? "-" : ""
-        const abs = Math.abs(value)
-        const digits = Math.floor(Math.log10(abs)) + 1
-        const scalePow = Math.max(0, digits - sig)
-        const scale = Math.pow(10, scalePow)
-        const rounded = Math.round(abs / scale) * scale
-        return `£${sign}${Math.trunc(rounded).toLocaleString()}`
+    if (!hasMinimumData) {
+        return (
+            <div className="p-8 bg-gray-100 rounded-lg text-center text-gray-600">
+                Please complete the Personal Info, Assets, and Income Needs sections to see your retirement projection.
+            </div>
+        )
     }
-
-    const formatGBP3 = (value: number) => formatGBP(value, 3)
-
-    // Display order and labels for asset types in nested withdrawal tables
-    const assetDisplayOrder: AssetType[] = [
-        AssetType.Cash,
-        AssetType.ISA,
-        AssetType.StocksAndShares,
-        AssetType.Bonds,
-        AssetType.PensionCrystallised,
-        AssetType.Pension,
-        AssetType.Property
-    ]
-    const assetLabels: Record<AssetType, string> = {
-        [AssetType.Cash]: "Cash",
-        [AssetType.ISA]: "ISAs",
-        [AssetType.StocksAndShares]: "Stocks",
-        [AssetType.Bonds]: "Bonds",
-        [AssetType.PensionCrystallised]: "Pension (crystallised)",
-        [AssetType.Pension]: "Pension",
-        [AssetType.Property]: "Property"
-    }
-
-    // Determine if each person actually has any pension assets; if not, suppress pension line items
-    const primaryHasPension = useMemo(
-        () =>
-            data.assets.some(
-                a =>
-                    !a.belongsToSpouse &&
-                    (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
-            ),
-        [data.assets]
-    )
-    const spouseHasPension = useMemo(
-        () =>
-            data.assets.some(
-                a =>
-                    a.belongsToSpouse &&
-                    (a.category === AssetType.Pension || a.category === AssetType.PensionCrystallised)
-            ),
-        [data.assets]
-    )
 
     // Custom tooltip for the Asset Projection chart so we can include Total assets
     const AssetTooltip = ({ active, payload, label }: any) => {
         if (!active || !payload || payload.length === 0) return null
         const year: number = label
-        const idx = yearlyData.findIndex(d => d.year === year)
-        const prev = idx > 0 ? (yearlyData[idx - 1] as any) : null
-        const curr = yearlyData[idx] as any
+        const idx = householdSeries.findIndex(d => d.year === year)
+        const prev = idx > 0 ? householdSeries[idx - 1] : null
+        const curr = householdSeries[idx]
 
         const total = Number(curr?.assets || 0)
         const totalPrev = Number(prev?.assets || 0)
         const totalDelta = total - totalPrev
-        const totalArrow = totalDelta > 0 ? "▲" : totalDelta < 0 ? "▼" : "•"
+        const totalArrow = totalDelta > 0 ? "â–²" : totalDelta < 0 ? "â–¼" : "â€¢"
         const totalSign = totalDelta > 0 ? "+" : totalDelta < 0 ? "-" : ""
         const totalAbs = Math.abs(totalDelta)
 
@@ -213,13 +180,13 @@ export default function RetirementProjection({ data, setData }: Props) {
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>Year {year}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {payload.map((item: any) => {
-                        const key = item?.dataKey as string
+                        const key = item?.dataKey as keyof HouseholdYearly
                         const name = item?.name as string
                         const color = item?.color as string
                         const currVal = Number(curr?.[key] || 0)
                         const prevVal = Number(prev?.[key] || 0)
                         const delta = currVal - prevVal
-                        const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "•"
+                        const arrow = delta > 0 ? "–²" : delta < 0 ? "–¼" : "€¢"
                         const sign = delta > 0 ? "+" : delta < 0 ? "-" : ""
                         const absDelta = Math.abs(delta)
                         return (
@@ -262,32 +229,32 @@ export default function RetirementProjection({ data, setData }: Props) {
     return (
         <div className="flex flex-col gap-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg text-white">
+                <div className="p-6 bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg text-white">
                     <div className="text-sm opacity-90 mb-2">Current Assets</div>
                     <div className="text-3xl font-bold">£{currentAssets.toLocaleString()}</div>
                 </div>
 
-                <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg text-white">
+                <div className="p-6 bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg text-white">
                     <div className="text-sm opacity-90 mb-2">Projected at Retirement</div>
                     <div className="text-3xl font-bold">
                         £
                         {Math.round(
-                            yearlyData.find(d => d.age === data.personal.retirementAge)?.assets || 0
+                            householdSeries.find(d => d.age === data.personal.retirementAge)?.assets || 0
                         ).toLocaleString()}
                     </div>
                 </div>
 
                 {runsOutAt ? (
-                    <div className={`p-6 bg-gradient-to-r ${variantColors[getVariant()]} rounded-lg text-white`}>
+                    <div className={`p-6 bg-linear-to-r ${variantColors[getVariant()]} rounded-lg text-white`}>
                         <div className="text-sm opacity-90 mb-2">Money Runs Out</div>
                         <div className="text-3xl font-bold">
                             Age {runsOutAt - new Date(data.personal.dateOfBirth).getFullYear()}
                         </div>
                     </div>
                 ) : (
-                    <div className="p-6 bg-gradient-to-r from-green-600 to-green-700 rounded-lg text-white">
+                    <div className="p-6 bg-linear-to-r from-green-600 to-green-700 rounded-lg text-white">
                         <div className="text-sm opacity-90 mb-2">Projection Status</div>
-                        <div className="text-3xl font-bold">Sustainable ✓</div>
+                        <div className="text-3xl font-bold">Sustainable ✅</div>
                     </div>
                 )}
             </div>
@@ -373,7 +340,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                     </div>
                 </div>
                 <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={yearlyData} margin={{ top: 10, right: 20, left: 10, bottom: 30 }}>
+                    <AreaChart data={householdSeries} margin={{ top: 10, right: 20, left: 10, bottom: 30 }}>
                         <defs>
                             {/* Hatch pattern for crystallised pension - same colour as pension but hatched */}
                             <pattern
@@ -465,7 +432,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                     {strategy === "tax_optimized" ? (
                         <>
                             <strong>Minimise higher-rate tax:</strong> Use ISA first up to the 40% threshold; then draw
-                            taxable income in order Cash → Pension → Property.
+                            taxable income in order Cash â†’ Pension â†’ Property.
                         </>
                     ) : (
                         <>
@@ -479,7 +446,7 @@ export default function RetirementProjection({ data, setData }: Props) {
             <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Annual Income vs Expenditure</h3>
                 <ResponsiveContainer width="100%" height={400}>
-                    <ComposedChart data={yearlyData} margin={{ top: 10, right: 20, left: 60, bottom: 30 }}>
+                    <ComposedChart data={householdSeries} margin={{ top: 10, right: 20, left: 60, bottom: 30 }}>
                         <defs>
                             {/* Subtle hatch pattern to indicate unfavourable outflows without overpowering */}
                             <pattern
@@ -507,7 +474,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                         />
                         <Legend />
                         <Bar dataKey="statePension" stackId="income" fill="#34d399" name="State Pension" />
-                        <Bar dataKey="retirementIncome" stackId="income" fill="#8b5cf6" name="Retirement Income" />
+                        <Bar dataKey="otherIncome" stackId="income" fill="#8b5cf6" name="Other Income" />
                         <Bar
                             dataKey="assetWithdrawals"
                             stackId="income"
@@ -555,197 +522,7 @@ export default function RetirementProjection({ data, setData }: Props) {
 
             {/* Yearly breakdown: per-person rows showing initial position, income, expenditure and withdrawals.
                 Same data is exported to Excel via the Download button. */}
-            <YearlyBreakdownSection data={data} projection={projections[strategy]} formatGBP3={formatGBP3} />
-        </div>
-    )
-}
-
-function YearlyBreakdownSection({
-    data,
-    projection,
-    formatGBP3
-}: {
-    data: RetirementData
-    projection: ReturnType<typeof calculateProjection>
-    formatGBP3: (value: number) => string
-}) {
-    const [downloading, setDownloading] = useState(false)
-    const table = useMemo(() => buildYearlyExportTable(data, projection), [data, projection])
-
-    const handleDownload = async () => {
-        try {
-            setDownloading(true)
-            await downloadYearlyExcel(data, projection)
-        } catch (err) {
-            console.error("Failed to generate Excel export:", err)
-        } finally {
-            setDownloading(false)
-        }
-    }
-
-    const fmt = (v: number) => (v === 0 ? <span className="text-gray-300">—</span> : formatGBP3(v))
-
-    return (
-        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg">
-            <div className="flex items-start justify-between mb-4 gap-4">
-                <div>
-                    <h3 className="text-xl font-semibold text-gray-900">Yearly Breakdown</h3>
-                    <p className="text-xs text-gray-500 mt-1">
-                        Two rows per year (Me / Partner): initial position at the start of the year, income by source,
-                        household expenditure, and withdrawals broken down by asset pool. Values shown to 3 significant
-                        figures; the Excel download contains exact figures with GBP formatting.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={handleDownload}
-                    disabled={downloading}
-                    className="shrink-0 inline-flex items-center px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                    {downloading ? "Preparing…" : "Download Excel"}
-                </button>
-            </div>
-
-            <div className="overflow-auto">
-                <table className="min-w-full text-sm border-collapse">
-                    <thead>
-                        <tr className="bg-gray-50 text-gray-700">
-                            <th className="text-left px-2 py-2 border-b" rowSpan={2}>
-                                Year
-                            </th>
-                            <th className="text-left px-2 py-2 border-b" rowSpan={2}>
-                                Person
-                            </th>
-                            {table.visibleAssetTypes.length > 0 && (
-                                <th
-                                    className="text-center px-2 py-2 border-b bg-blue-50"
-                                    colSpan={table.visibleAssetTypes.length + 1}
-                                >
-                                    Initial position
-                                </th>
-                            )}
-                            <th className="text-center px-2 py-2 border-b bg-green-50" colSpan={3}>
-                                Income
-                            </th>
-                            <th className="text-center px-2 py-2 border-b bg-amber-50" colSpan={4}>
-                                Expenditure
-                            </th>
-                            <th className="text-right px-2 py-2 border-b bg-violet-50" rowSpan={2}>
-                                Net Income − Expenditure
-                            </th>
-                            {table.visibleAssetTypes.length > 0 && (
-                                <th
-                                    className="text-center px-2 py-2 border-b bg-rose-50"
-                                    colSpan={table.visibleAssetTypes.length + 1}
-                                >
-                                    Withdrawals
-                                </th>
-                            )}
-                        </tr>
-                        <tr className="bg-gray-50 text-gray-700 text-xs">
-                            {table.visibleAssetTypes.map(t => (
-                                <th key={`init-${t}`} className="text-right px-2 py-1 border-b bg-blue-50">
-                                    {ASSET_LABELS[t]}
-                                </th>
-                            ))}
-                            {table.visibleAssetTypes.length > 0 && (
-                                <th className="text-right px-2 py-1 border-b bg-blue-50">Total</th>
-                            )}
-                            <th className="text-right px-2 py-1 border-b bg-green-50">State Pension</th>
-                            <th className="text-right px-2 py-1 border-b bg-green-50">Retirement</th>
-                            <th className="text-right px-2 py-1 border-b bg-green-50">Total</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">Spending</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">Income Tax</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">CGT</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">Total</th>
-                            {table.visibleAssetTypes.map(t => (
-                                <th key={`wd-${t}`} className="text-right px-2 py-1 border-b bg-rose-50">
-                                    {ASSET_LABELS[t]}
-                                </th>
-                            ))}
-                            {table.visibleAssetTypes.length > 0 && (
-                                <th className="text-right px-2 py-1 border-b bg-rose-50">Total</th>
-                            )}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {table.rows.map((row, idx) => {
-                            const isYearStart = row.pool === "primary"
-                            return (
-                                <tr
-                                    key={`${row.year}-${row.pool}`}
-                                    className={`${
-                                        Math.floor(idx / 2) % 2 === 0 ? "bg-white" : "bg-gray-50"
-                                    } ${isYearStart && idx > 0 ? "border-t-2 border-gray-200" : ""}`}
-                                >
-                                    <td className="px-2 py-1 text-gray-800 whitespace-nowrap">
-                                        {isYearStart ? row.year : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-gray-700 whitespace-nowrap">{row.personLabel}</td>
-                                    {table.visibleAssetTypes.map(t => (
-                                        <td
-                                            key={`init-${row.year}-${row.pool}-${t}`}
-                                            className="px-2 py-1 text-right tabular-nums whitespace-nowrap"
-                                        >
-                                            {fmt(row.initial[t] || 0)}
-                                        </td>
-                                    ))}
-                                    {table.visibleAssetTypes.length > 0 && (
-                                        <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                            {fmt(row.initialTotal)}
-                                        </td>
-                                    )}
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {fmt(row.statePension)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {fmt(row.retirementIncome)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                        {fmt(row.incomeTotal)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {isYearStart ? fmt(row.expenditure) : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {isYearStart ? fmt(row.tax) : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {isYearStart ? fmt(row.cgt) : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                        {isYearStart ? fmt(row.expenditureTotal) : ""}
-                                    </td>
-                                    <td
-                                        className={`px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium ${
-                                            isYearStart && row.netIncomeExpenditure < 0
-                                                ? "text-red-600"
-                                                : isYearStart && row.netIncomeExpenditure > 0
-                                                  ? "text-green-700"
-                                                  : ""
-                                        }`}
-                                    >
-                                        {isYearStart ? fmt(row.netIncomeExpenditure) : ""}
-                                    </td>
-                                    {table.visibleAssetTypes.map(t => (
-                                        <td
-                                            key={`wd-${row.year}-${row.pool}-${t}`}
-                                            className="px-2 py-1 text-right tabular-nums whitespace-nowrap"
-                                        >
-                                            {fmt(row.withdrawals[t] || 0)}
-                                        </td>
-                                    ))}
-                                    {table.visibleAssetTypes.length > 0 && (
-                                        <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                            {fmt(row.withdrawalsTotal)}
-                                        </td>
-                                    )}
-                                </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
-            </div>
+            <YearlyBreakdownSection data={data} projection={projections[strategy]} />
         </div>
     )
 }

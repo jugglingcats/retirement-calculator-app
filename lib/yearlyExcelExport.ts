@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs"
-import { ASSET_LABELS, buildYearlyExportTable, YearlyExportRow, YearlyExportTable } from "@/lib/yearlyExport"
-import { AssetType, ProjectionResult, RetirementData } from "@/lib/types"
+import { buildYearlyExportTable, YearlyExportRow, YearlyExportTable } from "@/lib/yearlyExport"
+import { ASSET_LABELS } from "@/lib/yearlyView"
+import { AssetPoolType, AssetType, ProjectionResult, RetirementData } from "@/lib/types"
 
 const GBP_FORMAT = "[$£-809]#,##0;[Red]-[$£-809]#,##0"
 
@@ -46,11 +47,11 @@ function buildColumns(table: YearlyExportTable): ColumnSpec[] {
         value: r => r.statePension
     })
     cols.push({
-        header: "Income: Retirement Income",
+        header: "Income: Other Income",
         group: "income",
         width: 22,
         currency: true,
-        value: r => r.retirementIncome
+        value: r => r.otherIncome
     })
     cols.push({
         header: "Income: Total",
@@ -185,7 +186,7 @@ export async function buildYearlyWorkbook(data: RetirementData, projection: Proj
     table.rows.forEach((row, rIdx) => {
         const values = columns.map(c => c.value(row))
         const xlRow = sheet.addRow(values)
-        const isYearStart = row.pool === "primary"
+        const isYearStart = row.poolIndex === AssetPoolType.PRIMARY
         columns.forEach((c, idx) => {
             const cell = xlRow.getCell(idx + 1)
             if (c.currency) {

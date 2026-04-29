@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest"
 import { calculateProjection } from "@/lib/calculations"
-import { AssetType, RetirementData } from "@/lib/types"
+import { AssetType, RetirementData, YearlyDatapoint } from "@/lib/types"
+import { householdYearly } from "@/lib/yearlyView"
+
+// Convenience: flatten a per-pool `YearlyDatapoint` into the household-level
+// snapshot so tests can keep asserting on simple flat fields.
+const hh = (yd: YearlyDatapoint) => householdYearly(yd)
 
 function baseData(overrides: Partial<RetirementData> = {}): RetirementData {
     const current = new Date()
@@ -77,8 +82,8 @@ describe("calculateProjection", () => {
         const result = calculateProjection(data)
         const startAge = 60
         const arr = result.yearlyData
-        const at66 = arr.find(y => y.age === 66)!
-        const at67 = arr.find(y => y.age === 67)!
+        const at66 = hh(arr.find(y => y.age === 66)!)
+        const at67 = hh(arr.find(y => y.age === 67)!)
         expect(at66.statePension).toBe(0)
         expect(at67.statePension).toBe(11502)
     })
@@ -94,7 +99,7 @@ describe("calculateProjection", () => {
             }
         })
         const result = calculateProjection(data)!
-        const at67 = result.yearlyData.find(y => y.age === 67)!
+        const at67 = hh(result.yearlyData.find(y => y.age === 67)!)
         // At age 67 primary gets pension, spouse 67 too, so double
         expect(at67.statePension).toBe(11502 * 2)
     })
@@ -116,7 +121,7 @@ describe("calculateProjection", () => {
         })
         // With equal 0% growth rates, order is undetermined but doesn't matter
         const result = calculateProjection(data, 1, "lowest_growth_first")
-        const first = result.yearlyData[0]
+        const first = hh(result.yearlyData[0])
         // With 0 growth, total assets = 10000, need 4000
         expect(first.assets).toBe(6000)
     })
@@ -170,8 +175,8 @@ describe("calculateProjection", () => {
         const thisYear = fixedNow.getFullYear()
         const data = { ...base, personal: { ...base.personal, dateOfBirth: `${thisYear - 60}-01-01` } }
         const result = calculateProjection(data)!
-        const at60 = result.yearlyData.find(y => y.age === 60)!
-        const at61 = result.yearlyData.find(y => y.age === 61)!
+        const at60 = hh(result.yearlyData.find(y => y.age === 60)!)
+        const at61 = hh(result.yearlyData.find(y => y.age === 61)!)
         expect(at61.cash - at60.cash).toBe(1000)
         expect(at61.assets - at60.assets).toBe(1000)
     })
@@ -196,7 +201,7 @@ describe("calculateProjection", () => {
         const ageRunOut = 60 + 2 // third year
         const yearRunOut = thisYear - 60 + ageRunOut
         expect(result.runsOutAt).toBe(yearRunOut)
-        const atRunOut = result.yearlyData.find(y => y.age === ageRunOut)!
+        const atRunOut = hh(result.yearlyData.find(y => y.age === ageRunOut)!)
         expect(atRunOut.assets).toBe(0)
     })
 
@@ -227,7 +232,7 @@ describe("calculateProjection", () => {
             ]
         })
         const result = calculateProjection(data)!
-        const first = result.yearlyData.find(y => y.age === 60)!
+        const first = hh(result.yearlyData.find(y => y.age === 60)!)
         expect(first.taxPayable).toBe(0)
         // With 0 growth, assets remain same
         expect(first.assets).toBe(1000)
@@ -252,7 +257,7 @@ describe("calculateProjection", () => {
             incomeNeeds: [{ id: "need", description: "Need", annualAmount: 0, startingAge: 70 }]
         })
         const result = calculateProjection(data)!
-        const first = result.yearlyData.find(y => y.age === 60)!
+        const first = hh(result.yearlyData.find(y => y.age === 60)!)
         // Combined cash: 5000 + 3000 = 8000, Combined ISA: 2000 + 1000 = 3000
         expect(first.cash).toBe(8000)
         expect(first.isa).toBe(3000)
@@ -288,8 +293,8 @@ describe("calculateProjection", () => {
             ]
         })
         const result = calculateProjection(data)!
-        const at60 = result.yearlyData.find(y => y.age === 60)!
-        const at61 = result.yearlyData.find(y => y.age === 61)!
+        const at60 = hh(result.yearlyData.find(y => y.age === 60)!)
+        const at61 = hh(result.yearlyData.find(y => y.age === 61)!)
         // Both one-offs happen at age 61, total cash increase should be 3000
         expect(at61.cash - at60.cash).toBe(3000)
         expect(at61.assets - at60.assets).toBe(3000)
@@ -332,9 +337,9 @@ describe("calculateProjection", () => {
             ]
         })
         const result = calculateProjection(data)!
-        const first = result.yearlyData.find(y => y.age === 60)!
-        // Total retirement income should be 10000 (5000 + 5000)
-        expect(first.retirementIncome).toBe(10000)
+        const first = hh(result.yearlyData.find(y => y.age === 60)!)
+        // Total other (non-state) income should be 10000 (5000 + 5000)
+        expect(first.otherIncome).toBe(10000)
         // Income covers expenditure, no tax should be due (both under personal allowance)
         expect(first.taxPayable).toBe(0)
     })
