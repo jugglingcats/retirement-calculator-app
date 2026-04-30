@@ -1,6 +1,6 @@
 "use client"
 
-import { RetirementData } from "@/lib/types"
+import { RetirementData, TaxSettings } from "@/lib/types"
 import { NumericInput } from "@/components/ui/numeric-input"
 
 interface Props {
@@ -9,6 +9,16 @@ interface Props {
 }
 
 export default function AssumptionsForm({ data, setData }: Props) {
+    const updateIncomeTax = (updates: Partial<TaxSettings>) => {
+        setData({
+            ...data,
+            incomeTax: {
+                ...data.incomeTax,
+                ...updates
+            }
+        })
+    }
+
     const categories = ["pension", "stocks", "property", "bonds", "cash", "other"]
 
     const updateInflation = (value: number) => {
@@ -328,6 +338,40 @@ export default function AssumptionsForm({ data, setData }: Props) {
                         <p className="text-sm text-gray-500">
                             Tax rate applied to gains above the allowance. Default is 18%.
                         </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Income Tax</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                    Configure tax thresholds for optimal drawdown calculations. These values are used to calculate your
+                    tax liability in retirement. By default, these thresholds increase at the same rate as inflation but
+                    you can change this above. Your tax liability changes according to the drawdown strategy you select
+                    on the Projection tab and whether you enabled Bed and ISA.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">Personal Allowance (£)</label>
+                        <input
+                            type="number"
+                            value={data.incomeTax.personalAllowance}
+                            onChange={e => updateIncomeTax({ personalAllowance: Number(e.target.value) })}
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                            placeholder="12570"
+                        />
+                        <p className="text-sm text-gray-500">Tax-free income allowance (2024/25: £12,570)</p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">Higher Rate Threshold (£)</label>
+                        <input
+                            type="number"
+                            value={data.incomeTax.higherRateThreshold}
+                            onChange={e => updateIncomeTax({ higherRateThreshold: Number(e.target.value) })}
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                            placeholder="50270"
+                        />
+                        <p className="text-sm text-gray-500">Income above this is taxed at 40% (2024/25: £50,270)</p>
                     </div>
                 </div>
             </div>

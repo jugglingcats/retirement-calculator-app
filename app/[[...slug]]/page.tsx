@@ -7,7 +7,6 @@ import PersonalInfoForm from "@/components/PersonalInfoForm"
 import AssetsForm from "@/components/AssetsForm"
 import IncomeNeedsForm from "@/components/IncomeNeedsForm"
 import IncomeForm from "@/components/IncomeForm"
-import IncomeTaxForm from "@/components/IncomeTaxForm"
 import AssumptionsForm from "@/components/AssumptionsForm"
 import ShocksForm from "@/components/ShocksForm"
 import OneOffsForm from "@/components/OneOffsForm"
@@ -28,7 +27,6 @@ const tabs: TabDef[] = [
     { slug: "income", name: "Income", component: IncomeForm },
     { slug: "expenditure", name: "Expenditure", component: IncomeNeedsForm },
     { slug: "one-offs", name: "One Offs", component: OneOffsForm },
-    { slug: "income-tax", name: "Income Tax", component: IncomeTaxForm },
     { slug: "assumptions", name: "Assumptions", component: AssumptionsForm },
     { slug: "market-shocks", name: "Market Shocks", component: ShocksForm },
     { slug: "projection", name: "Projection", component: RetirementProjection }
@@ -178,7 +176,7 @@ export default function CalculatorPage({ params }: { params: Promise<{ slug?: st
                                     href={`/${tab.slug}`}
                                     className={`px-4 py-3 font-semibold transition-all rounded-t-lg ${
                                         isActive
-                                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                                            ? "bg-linear-to-r from-indigo-600 to-purple-600 text-white"
                                             : "text-gray-600 hover:bg-gray-100"
                                     }`}
                                 >
