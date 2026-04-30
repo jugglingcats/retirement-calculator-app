@@ -482,4 +482,164 @@ describe("Bed and ISA", () => {
             expect(firstYear.cash).toBe(25000)
         })
     })
+
+    describe("Stocks to ISA conversion", () => {
+        it("converts stocks (with no embedded gain) into ISA up to the annual ISA allowance, before touching pension", () => {
+            const data = baseData({
+                personal: {
+                    dateOfBirth: "1970-01-01", // Age 55 — pension would also be eligible
+                    spouseDateOfBirth: "",
+                    retirementAge: 65
+                },
+                assets: [
+                    // baseCost == value -> no gain, so CGT allowance never bites
+                    {
+                        id: "s",
+                        name: "Stocks",
+                        value: 50000,
+                        baseCost: 50000,
+                        category: AssetType.StocksAndShares
+                    },
+                    { id: "p", name: "Pension", value: 200000, category: AssetType.Pension },
+                    { id: "i", name: "ISA", value: 0, category: AssetType.ISA }
+                ]
+            })
+
+            const result = calculateProjection(data, 1)
+            const firstYear = hh(result.yearlyData[0])
+
+            // £20,000 stocks moved into ISA — fully consumes the £20k ISA allowance.
+            // Stocks: 50000 - 20000 = 30000.
+            // No leftover allowance for pension crystallisation -> pension untouched.
+            expect(firstYear.stocks).toBe(30000)
+            expect(firstYear.isa).toBe(20000)
+            expect(firstYear.pension).toBe(200000)
+            expect(firstYear.pensionCrystallised).toBe(0)
+        })
+
+        it("limits stocks transfer by the CGT allowance (£3000 default)", () => {
+            const data = baseData({
+                personal: {
+                    dateOfBirth: "1970-01-01",
+                    spouseDateOfBirth: "",
+                    retirementAge: 65
+                },
+                assets: [
+                    // 100% gain: every £1 transferred = £1 of gain.
+                    {
+                        id: "s",
+                        name: "Stocks",
+                        value: 50000,
+                        baseCost: 0,
+                        category: AssetType.StocksAndShares
+                    },
+                    { id: "p", name: "Pension", value: 0, category: AssetType.Pension },
+                    { id: "i", name: "ISA", value: 0, category: AssetType.ISA }
+                ]
+            })
+
+            const result = calculateProjection(data, 1)
+            const firstYear = hh(result.yearlyData[0])
+
+            // Only £3,000 can be transferred (gain == transfer with 100% gain ratio).
+            expect(firstYear.stocks).toBe(47000)
+            expect(firstYear.isa).toBe(3000)
+        })
+
+        it("uses leftover ISA allowance for pension crystallisation after partial stocks transfer", () => {
+            const data = baseData({
+                personal: {
+                    dateOfBirth: "1970-01-01", // Age 55
+                    spouseDateOfBirth: "",
+                    retirementAge: 65
+                },
+                assets: [
+                    // 100% gain -> only £3,000 of stocks can move under CGT allowance
+                    {
+                        id: "s",
+                        name: "Stocks",
+                        value: 50000,
+                        baseCost: 0,
+                        category: AssetType.StocksAndShares
+                    },
+                    { id: "p", name: "Pension", value: 200000, category: AssetType.Pension },
+                    { id: "i", name: "ISA", value: 0, category: AssetType.ISA }
+                ]
+            })
+
+            const result = calculateProjection(data, 1)
+            const firstYear = hh(result.yearlyData[0])
+
+            // £3,000 from stocks consumes part of the £20k ISA allowance.
+            // Remaining £17,000 to fill via pension crystallisation: £17,000 * 4 = £68,000 crystallised.
+            //   -> £17,000 (25%) tax-free into ISA; £51,000 (75%) into pensionCrystallised.
+            // Pension uncrystallised: 200000 - 68000 = 132000.
+            expect(firstYear.stocks).toBe(47000)
+            expect(firstYear.isa).toBe(3000 + 17000)
+            expect(firstYear.pension).toBe(132000)
+            expect(firstYear.pensionCrystallised).toBe(51000)
+        })
+
+        it("gifts stocks between spouses to fully utilise both ISA allowances", () => {
+            const data = baseData({
+                personal: {
+                    dateOfBirth: "1970-01-01",
+                    spouseDateOfBirth: "1968-01-01",
+                    retirementAge: 65
+                },
+                assets: [
+                    // All stocks belong to primary, no gain -> CGT non-binding.
+                    {
+                        id: "s",
+                        name: "Stocks",
+                        value: 100000,
+                        baseCost: 100000,
+                        category: AssetType.StocksAndShares
+                    },
+                    { id: "i1", name: "ISA", value: 0, category: AssetType.ISA },
+                    { id: "i2", name: "Spouse ISA", value: 0, category: AssetType.ISA, belongsToSpouse: true }
+                ]
+            })
+
+            const result = calculateProjection(data, 1)
+            const firstYear = hh(result.yearlyData[0])
+
+            // Primary uses £20k from own stocks; spouse receives £20k gifted stocks → ISA.
+            // Total stocks moved: £40,000.
+            expect(firstYear.stocks).toBe(60000)
+            expect(firstYear.isa).toBe(40000)
+        })
+
+        it("respects a custom annualISAAllowance from assumptions", () => {
+            const data = baseData({
+                personal: {
+                    dateOfBirth: "1970-01-01",
+                    spouseDateOfBirth: "",
+                    retirementAge: 65
+                },
+                assets: [
+                    {
+                        id: "s",
+                        name: "Stocks",
+                        value: 50000,
+                        baseCost: 50000,
+                        category: AssetType.StocksAndShares
+                    },
+                    { id: "i", name: "ISA", value: 0, category: AssetType.ISA }
+                ],
+                assumptions: {
+                    inflationRate: 0,
+                    categoryGrowthRates: { cash: 0, stocks: 0, pension: 0, property: 0 },
+                    bedAndISAEnabled: true,
+                    annualISAAllowance: 10000
+                }
+            })
+
+            const result = calculateProjection(data, 1)
+            const firstYear = hh(result.yearlyData[0])
+
+            expect(firstYear.stocks).toBe(40000)
+            expect(firstYear.isa).toBe(10000)
+        })
+    })
 })

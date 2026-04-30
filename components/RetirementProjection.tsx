@@ -163,7 +163,11 @@ export default function RetirementProjection({ data, setData }: Props) {
         const total = Number(curr?.assets || 0)
         const totalPrev = Number(prev?.assets || 0)
         const totalDelta = total - totalPrev
-        const totalArrow = totalDelta > 0 ? "â–²" : totalDelta < 0 ? "â–¼" : "â€¢"
+
+        function to_arrow(delta: number) {
+            return delta > 0 ? "▲" : delta < 0 ? "▼" : ""
+        }
+        const totalArrow = to_arrow(totalDelta)
         const totalSign = totalDelta > 0 ? "+" : totalDelta < 0 ? "-" : ""
         const totalAbs = Math.abs(totalDelta)
 
@@ -186,7 +190,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                         const currVal = Number(curr?.[key] || 0)
                         const prevVal = Number(prev?.[key] || 0)
                         const delta = currVal - prevVal
-                        const arrow = delta > 0 ? "–²" : delta < 0 ? "–¼" : "€¢"
+                        const arrow = to_arrow(delta)
                         const sign = delta > 0 ? "+" : delta < 0 ? "-" : ""
                         const absDelta = Math.abs(delta)
                         return (

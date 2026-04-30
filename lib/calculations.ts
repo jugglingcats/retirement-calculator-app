@@ -23,7 +23,7 @@ import {
 } from "@/lib/types"
 import { sumPool } from "@/lib/yearlyView"
 import { calculateCGT, CGTWithdrawal, initialTaxPosition, updateTaxPosition } from "@/lib/tax"
-import { applyBedAndISA } from "@/lib/annual/bedAndIsa"
+import { applyBedAndISAToPensions, applyBedAndISAToStocks } from "@/lib/annual/bedAndIsa"
 import { applyOneOffs } from "@/lib/annual/oneOffs"
 import { applyMarketShock } from "@/lib/annual/marketShock"
 import { applyGrowth } from "@/lib/annual/growth"
@@ -68,9 +68,14 @@ export function calculateProjection(
         const spouseAge = year - (spouseBirthYear || Number.NaN)
         const ages = [age, spouseAge]
 
-        // Bed and ISA process runs at the start of each year for eligible individuals (age 55+)
+        // Bed and ISA process runs at the start of each year for eligible individuals.
+        // First convert taxable stocks into ISA (utilising the CGT allowance, optionally
+        // gifting between spouses), then use any remaining ISA allowance to crystallise
+        // pension (age 55+) and take the 25% tax-free lump sum into ISA.
         if (assumptions.bedAndISAEnabled) {
-            applyBedAndISA(assetPools, ages)
+            const hasSpouse = !isNaN(spouseAge)
+            const remainingISAAllowance = applyBedAndISAToStocks(assetPools, baseCostPools, assumptions, hasSpouse)
+            applyBedAndISAToPensions(assetPools, ages, remainingISAAllowance)
         }
 
         applyGrowth(assetPools, assumptions, age, retirementAge)

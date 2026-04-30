@@ -81,6 +81,16 @@ export default function AssumptionsForm({ data, setData }: Props) {
         })
     }
 
+    const updateAnnualISAAllowance = (value: number | undefined) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                annualISAAllowance: value
+            }
+        })
+    }
+
     const updateCGTAllowance = (value: number | undefined) => {
         setData({
             ...data,
@@ -184,9 +194,32 @@ export default function AssumptionsForm({ data, setData }: Props) {
                     </label>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                    When enabled, the projection will simulate the Bed and ISA process from age 55. Each year, up to
-                    £20,000 per person is transferred tax-free from pension to ISA (25% of £80,000 crystallised).
+                    When enabled, the projection will simulate the Bed and ISA process. Each year, up to the annual ISA
+                    allowance per person is moved into the ISA — first by transferring taxable stocks (within the CGT
+                    allowance, gifting between spouses where helpful), then from age 55 by crystallising pension to take
+                    the 25% tax-free lump sum.
                 </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className="flex flex-col gap-2">
+                        <label className="font-semibold text-gray-700">Annual ISA Allowance per person (£)</label>
+                        <input
+                            type="number"
+                            step="100"
+                            min={0}
+                            placeholder="20000"
+                            value={data.assumptions.annualISAAllowance ?? ""}
+                            onChange={e =>
+                                updateAnnualISAAllowance(
+                                    e.target.value === "" ? undefined : parseFloat(e.target.value)
+                                )
+                            }
+                            className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                        <p className="text-sm text-gray-500">
+                            Maximum amount each person can move into their ISA per tax year. Default is £20,000.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div className="p-6 bg-gray-50 rounded-lg border-2 border-gray-200">
