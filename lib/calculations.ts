@@ -64,7 +64,19 @@ export function calculateProjection(
 
     let runsOutAt: number = 0
 
+    // Gross income surplus (income minus expenditure, before tax is considered) carried
+    // from the previous year into each pool's cash. Tax is already deducted from the pool
+    // separately, so we carry the gross excess here and the two together produce the
+    // correct net cash deposit.
+    let surplusToDeposit: [number, number] = [0, 0]
+
     for (let age = currentAge; age <= maxAge; age++) {
+        // Deposit previous year's income surplus into cash at the start of this year,
+        // before bed-and-ISA, growth, and all other processing.
+        assetPools[0].cash += surplusToDeposit[0]
+        assetPools[1].cash += surplusToDeposit[1]
+        surplusToDeposit = [0, 0]
+
         const year = birthYear + age
         const yearsFromNow = year - currentYear
         const inflationMultiplier = Math.pow(1 + assumptions.inflationRate / 100, yearsFromNow)
@@ -208,6 +220,21 @@ export function calculateProjection(
             pool.cash -= cgtPayable
             withdrawalsDetailPerPool[i].cash += cgtPayable
         })
+
+        // Compute the net income surplus for this year and carry it into cash at the
+        // start of next year: income minus spending minus all tax due.
+        // In the surplus case the initial tax liability on income is never independently
+        // debited from cash (only additional tax on drawdowns is), so we must subtract
+        // the full tax position here to get the true net surplus.
+        const totalTaxThisYear = taxPosition[0].tax + taxPosition[1].tax
+        const totalCGTThisYear = cgtResults[0].cgtPayable + cgtResults[1].cgtPayable
+        const netSurplus = Math.max(0, baseTaxableIncome - expenditure - totalTaxThisYear - totalCGTThisYear)
+        if (netSurplus > 0 && baseTaxableIncome > 0) {
+            surplusToDeposit = [
+                netSurplus * taxableIncome[0] / baseTaxableIncome,
+                netSurplus * taxableIncome[1] / baseTaxableIncome
+            ]
+        }
 
         // Build the per-pool record. End-of-year balances are *not* stored: they can be
         // recovered as `initialPosition - withdrawals`.
