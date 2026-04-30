@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { IncomeNeed, RetirementData } from "@/lib/types"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 interface Props {
     data: RetirementData
@@ -89,11 +90,10 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
 
                 <div className="flex flex-col gap-2">
                     <label className="font-semibold text-gray-700 text-sm">Annual Amount (£ today&apos;s value)</label>
-                    <input
-                        type="number"
+                    <NumericInput
                         placeholder="30000"
-                        value={newNeed.annualAmount || ""}
-                        onChange={e => setNewNeed({ ...newNeed, annualAmount: parseFloat(e.target.value) || 0 })}
+                        value={newNeed.annualAmount || null}
+                        onChange={v => setNewNeed({ ...newNeed, annualAmount: v })}
                         required
                         className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
                     />
@@ -160,13 +160,12 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
                                                 <label className="text-sm font-medium text-gray-700">
                                                     Annual Amount (£)
                                                 </label>
-                                                <input
-                                                    type="number"
+                                                <NumericInput
                                                     value={displayData.annualAmount}
-                                                    onChange={e =>
+                                                    onChange={v =>
                                                         setEditingData({
                                                             ...editingData!,
-                                                            annualAmount: parseFloat(e.target.value) || 0
+                                                            annualAmount: v
                                                         })
                                                     }
                                                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"

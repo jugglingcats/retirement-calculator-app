@@ -1,6 +1,7 @@
 "use client"
 
 import { RetirementData } from "@/lib/types"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 interface Props {
     data: RetirementData
@@ -209,9 +210,7 @@ export default function AssumptionsForm({ data, setData }: Props) {
                             placeholder="20000"
                             value={data.assumptions.annualISAAllowance ?? ""}
                             onChange={e =>
-                                updateAnnualISAAllowance(
-                                    e.target.value === "" ? undefined : parseFloat(e.target.value)
-                                )
+                                updateAnnualISAAllowance(e.target.value === "" ? undefined : parseFloat(e.target.value))
                             }
                             className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
                         />
@@ -277,12 +276,11 @@ export default function AssumptionsForm({ data, setData }: Props) {
                     </div>
                     <div className="flex flex-col gap-2">
                         <label className="font-semibold text-gray-700">Years to target</label>
-                        <input
-                            type="number"
-                            step="1"
+                        <NumericInput
+                            integer
                             min={0}
-                            value={data.assumptions.investmentBalance?.yearsToTarget ?? ""}
-                            onChange={e => updateInvestmentBalance("yearsToTarget", parseInt(e.target.value) || 0)}
+                            value={data.assumptions.investmentBalance?.yearsToTarget ?? null}
+                            onChange={v => updateInvestmentBalance("yearsToTarget", v)}
                             disabled={!(data.assumptions.investmentBalanceEnabled ?? true)}
                             className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
                         />

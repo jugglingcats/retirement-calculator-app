@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Asset, AssetType, RetirementData } from "@/lib/types"
 import { isCGTLiable } from "@/lib/utils"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 interface Props {
     data: RetirementData
@@ -38,7 +39,14 @@ export default function AssetsForm({ data, setData }: Props) {
                 ...data,
                 assets: [...data.assets, { ...newAsset, id: Date.now().toString() }]
             })
-            setNewAsset({ id: "", name: "", value: 0, category: AssetType.Pension, belongsToSpouse: false, baseCost: undefined })
+            setNewAsset({
+                id: "",
+                name: "",
+                value: 0,
+                category: AssetType.Pension,
+                belongsToSpouse: false,
+                baseCost: undefined
+            })
         }
     }
 
@@ -197,13 +205,12 @@ export default function AssetsForm({ data, setData }: Props) {
                                                 <label className="text-sm font-medium text-gray-700">
                                                     Current Value (£)
                                                 </label>
-                                                <input
-                                                    type="number"
+                                                <NumericInput
                                                     value={displayData.value}
-                                                    onChange={e =>
+                                                    onChange={v =>
                                                         setEditingData({
                                                             ...editingData!,
-                                                            value: parseFloat(e.target.value) || 0
+                                                            value: v
                                                         })
                                                     }
                                                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
@@ -283,11 +290,12 @@ export default function AssetsForm({ data, setData }: Props) {
                                                 <div className="font-semibold text-gray-900">
                                                     £{displayData.value.toLocaleString()}
                                                 </div>
-                                                {isCGTLiable(displayData.category) && displayData.baseCost !== undefined && (
-                                                    <div className="text-sm text-gray-500">
-                                                        Base cost: £{displayData.baseCost.toLocaleString()}
-                                                    </div>
-                                                )}
+                                                {isCGTLiable(displayData.category) &&
+                                                    displayData.baseCost !== undefined && (
+                                                        <div className="text-sm text-gray-500">
+                                                            Base cost: £{displayData.baseCost.toLocaleString()}
+                                                        </div>
+                                                    )}
                                             </div>
                                             <div>
                                                 {displayData.belongsToSpouse && (

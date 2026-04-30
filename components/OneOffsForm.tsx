@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { OneOff, RetirementData } from "@/lib/types"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 interface OneOffsFormProps {
     data: RetirementData
@@ -173,17 +174,15 @@ export default function OneOffsForm({ data, setData }: OneOffsFormProps) {
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <label className="text-sm font-medium text-gray-700">Amount (£)</label>
-                                            <input
-                                                type="number"
+                                            <NumericInput
                                                 value={displayData.amount}
-                                                onChange={e =>
+                                                onChange={v =>
                                                     setEditingData({
                                                         ...editingData!,
-                                                        amount: parseFloat(e.target.value) || 0
+                                                        amount: v
                                                     })
                                                 }
                                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                                step="1000"
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">

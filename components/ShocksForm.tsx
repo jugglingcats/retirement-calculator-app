@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { FormEvent, useState } from "react"
 import { MarketShock, RetirementData } from "@/lib/types"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 interface Props {
     data: RetirementData
@@ -19,7 +20,7 @@ export default function ShocksForm({ data, setData }: Props) {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editingData, setEditingData] = useState<MarketShock | null>(null)
 
-    const addShock = (e: React.FormEvent) => {
+    const addShock = (e: FormEvent) => {
         e.preventDefault()
         if (newShock.year && newShock.impactPercent !== 0) {
             const shockToAdd: MarketShock = {
@@ -63,9 +64,7 @@ export default function ShocksForm({ data, setData }: Props) {
     const handleToggleEnabled = (id: string) => {
         setData({
             ...data,
-            shocks: data.shocks.map(shock =>
-                shock.id === id ? { ...shock, enabled: shock.enabled === false ? true : false } : shock
-            )
+            shocks: data.shocks.map(shock => (shock.id === id ? { ...shock, enabled: shock.enabled === false } : shock))
         })
     }
 
@@ -126,7 +125,7 @@ export default function ShocksForm({ data, setData }: Props) {
 
                 <button
                     type="submit"
-                    className="md:col-span-3 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
+                    className="md:col-span-3 px-6 py-3 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
                 >
                     Add Market Shock
                 </button>
@@ -163,14 +162,12 @@ export default function ShocksForm({ data, setData }: Props) {
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <label className="text-sm font-medium text-gray-700">Impact (%)</label>
-                                            <input
-                                                type="number"
-                                                step="1"
+                                            <NumericInput
                                                 value={displayData.impactPercent}
-                                                onChange={e =>
+                                                onChange={v =>
                                                     setEditingData({
                                                         ...editingData!,
-                                                        impactPercent: parseFloat(e.target.value) || 0
+                                                        impactPercent: v
                                                     })
                                                 }
                                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
