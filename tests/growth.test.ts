@@ -42,7 +42,7 @@ describe("applyGrowth with ISA investment lifestyling glide path", () => {
             [AssetType.Property]: 1000
         })
 
-        applyGrowth([pool], assumptions, /*age*/ 65, /*retirementAge*/ 65)
+        applyGrowth([pool], assumptions, /*ages*/ [65], /*retirementAges*/ [65])
 
         // ISA blended rate: 80% stocks (10%) + 20% bonds (2%) = 8.4%
         expect(Math.round(pool[AssetType.ISA])).toBe(1084)
@@ -56,7 +56,7 @@ describe("applyGrowth with ISA investment lifestyling glide path", () => {
     it("interpolates towards target equity over years to target", () => {
         const pool = makePool({ [AssetType.ISA]: 1000 })
         // 5 years after retirement with 10-year glide: 50% equity
-        applyGrowth([pool], assumptions, /*age*/ 70, /*retirementAge*/ 65)
+        applyGrowth([pool], assumptions, /*ages*/ [70], /*retirementAges*/ [65])
         // ISA blended: 50%*10% + 50%*2% = 6%
         expect(Math.round(pool[AssetType.ISA])).toBe(1060)
     })
@@ -64,7 +64,7 @@ describe("applyGrowth with ISA investment lifestyling glide path", () => {
     it("uses target equity percentage after glide completes", () => {
         const pool = makePool({ [AssetType.ISA]: 1000 })
         // 15 years after retirement with 10-year glide: target (20% equity)
-        applyGrowth([pool], assumptions, /*age*/ 80, /*retirementAge*/ 65)
+        applyGrowth([pool], assumptions, /*ages*/ [80], /*retirementAges*/ [65])
         // ISA blended: 20%*10% + 80%*2% = 3.6%
         expect(Math.round(pool[AssetType.ISA])).toBe(1036)
     })

@@ -239,7 +239,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                 </div>
 
                 <div className="p-6 bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg text-white">
-                    <div className="text-sm opacity-90 mb-2">Projected at Retirement</div>
+                    <div className="text-sm opacity-90 mb-2">Projected at Your Retirement</div>
                     <div className="text-3xl font-bold">
                         £
                         {Math.round(

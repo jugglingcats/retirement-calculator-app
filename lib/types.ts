@@ -2,6 +2,17 @@ export interface PersonalInfo {
     dateOfBirth: string
     spouseDateOfBirth: string
     retirementAge: number
+    /**
+     * Whether partner details (spouse date of birth and retirement age) should be
+     * included in the projection. When false, the spouse-related fields are
+     * ignored regardless of their stored values.
+     */
+    includePartner?: boolean
+    /**
+     * Desired retirement age for the partner. Defaults to {@link retirementAge}
+     * when not specified.
+     */
+    spouseRetirementAge?: number
 }
 
 export enum AssetType {

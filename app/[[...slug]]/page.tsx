@@ -25,8 +25,8 @@ interface TabDef {
 const tabs: TabDef[] = [
     { slug: "personal-info", name: "Personal Info", component: PersonalInfoForm },
     { slug: "assets", name: "Assets", component: AssetsForm },
-    { slug: "expenditure", name: "Expenditure", component: IncomeNeedsForm },
     { slug: "income", name: "Income", component: IncomeForm },
+    { slug: "expenditure", name: "Expenditure", component: IncomeNeedsForm },
     { slug: "one-offs", name: "One Offs", component: OneOffsForm },
     { slug: "income-tax", name: "Income Tax", component: IncomeTaxForm },
     { slug: "assumptions", name: "Assumptions", component: AssumptionsForm },

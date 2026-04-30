@@ -27,11 +27,13 @@ function equityPercentageForYear(
 
 // Applies annual growth to asset pools. If assumptions.investmentBalance is provided,
 // ISA growth is blended between stocks and bonds growth rates according to the glide path.
+// `ages` and `retirementAges` are per pool (index 0 = primary, 1 = spouse) so that each
+// member of the household can have their own ISA glide path keyed off their own retirement.
 export function applyGrowth(
     assetPools: AssetPool[],
     assumptions: Assumptions,
-    age: number,
-    retirementAge: number
+    ages: number[],
+    retirementAges: number[]
 ): void {
     const categoryGrowthRates = assumptions.categoryGrowthRates
 
@@ -39,30 +41,34 @@ export function applyGrowth(
     const stockRate = growthRateFor(categoryGrowthRates, AssetType.StocksAndShares)
     const bondRate = growthRateFor(categoryGrowthRates, AssetType.Bonds)
 
-    // Determine ISA blended equity weight if glide path is configured and enabled
     const ibEnabled = assumptions.investmentBalanceEnabled ?? true
     const ib = assumptions.investmentBalance
-    const isaEquityWeight =
-        ib && ibEnabled
-            ? equityPercentageForYear(
-                  age,
-                  retirementAge,
-                  ib.initialEquityPercentage,
-                  ib.targetEquityPercentage,
-                  ib.yearsToTarget
-              ) / 100
-            : null
 
-    for (const assets of assetPools) {
+    assetPools.forEach((assets, idx) => {
+        const age = ages[idx]
+        const retirementAge = retirementAges[idx]
+        // Determine ISA blended equity weight if glide path is configured and enabled.
+        // When the per-pool age is missing/NaN (e.g. an absent partner), skip the glide
+        // path for that pool — the pool is empty anyway.
+        const isaEquityWeight =
+            ib && ibEnabled && Number.isFinite(age) && Number.isFinite(retirementAge)
+                ? equityPercentageForYear(
+                      age,
+                      retirementAge,
+                      ib.initialEquityPercentage,
+                      ib.targetEquityPercentage,
+                      ib.yearsToTarget
+                  ) / 100
+                : null
+
         for (const type of Object.values(AssetType)) {
             let growthRate: number
             if (type === AssetType.ISA && isaEquityWeight !== null) {
-                // Blend ISA growth: equity portion grows at stocks rate, remainder at bonds rate
                 growthRate = isaEquityWeight * stockRate + (1 - isaEquityWeight) * bondRate
             } else {
                 growthRate = growthRateFor(categoryGrowthRates, type)
             }
             assets[type] *= 1 + growthRate
         }
-    }
+    })
 }

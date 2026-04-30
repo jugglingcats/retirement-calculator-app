@@ -53,14 +53,22 @@ export function calculateProjection(
     // Build base cost pools for CGT calculation (tracks original cost basis)
     const baseCostPools = buildBaseCgtCostPools(assets)
 
-    const spouseBirthYear = personal.spouseDateOfBirth ? new Date(personal.spouseDateOfBirth).getFullYear() : null
+    // The partner is included in the projection only when explicitly enabled. For
+    // backward compatibility with saved data created before the toggle existed,
+    // treat the presence of `spouseDateOfBirth` as implicitly enabling the partner.
+    const includePartner = personal.includePartner ?? Boolean(personal.spouseDateOfBirth)
+    const spouseBirthYear =
+        includePartner && personal.spouseDateOfBirth ? new Date(personal.spouseDateOfBirth).getFullYear() : null
+    // Partner's retirement age defaults to the primary's when unset.
+    const spouseRetirementAge = includePartner ? personal.spouseRetirementAge ?? retirementAge : retirementAge
 
-    // Per-pool retirement year used for income streams that end at retirement.
-    // The configured retirementAge applies to both members of the household; if
-    // no spouse is configured we fall back to the primary's retirement year.
+    // Per-pool retirement year used for income streams that end at retirement, and
+    // for the ISA glide path. When no partner is configured we fall back to the
+    // primary's retirement year for the (empty) spouse pool.
     const primaryRetirementYear = birthYear + retirementAge
-    const spouseRetirementYear = (spouseBirthYear ?? birthYear) + retirementAge
+    const spouseRetirementYear = (spouseBirthYear ?? birthYear) + spouseRetirementAge
     const retirementYears: [number, number] = [primaryRetirementYear, spouseRetirementYear]
+    const retirementAges: [number, number] = [retirementAge, spouseRetirementAge]
 
     let runsOutAt: number = 0
 
@@ -97,7 +105,7 @@ export function calculateProjection(
             applyBedAndISAToPensions(assetPools, ages, remainingISAAllowance)
         }
 
-        applyGrowth(assetPools, assumptions, age, retirementAge)
+        applyGrowth(assetPools, assumptions, ages, retirementAges)
         applyOneOffs(assetPools, oneOffs, ages, inflationMultiplier)
         applyMarketShock(
             assetPools,
