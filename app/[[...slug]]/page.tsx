@@ -6,7 +6,7 @@ import Link from "next/link"
 import PersonalInfoForm from "@/components/PersonalInfoForm"
 import AssetsForm from "@/components/AssetsForm"
 import IncomeNeedsForm from "@/components/IncomeNeedsForm"
-import RetirementIncomeForm from "@/components/RetirementIncomeForm"
+import IncomeForm from "@/components/IncomeForm"
 import IncomeTaxForm from "@/components/IncomeTaxForm"
 import AssumptionsForm from "@/components/AssumptionsForm"
 import ShocksForm from "@/components/ShocksForm"
@@ -26,7 +26,7 @@ const tabs: TabDef[] = [
     { slug: "personal-info", name: "Personal Info", component: PersonalInfoForm },
     { slug: "assets", name: "Assets", component: AssetsForm },
     { slug: "expenditure", name: "Expenditure", component: IncomeNeedsForm },
-    { slug: "retirement-income", name: "Retirement Income", component: RetirementIncomeForm },
+    { slug: "income", name: "Income", component: IncomeForm },
     { slug: "one-offs", name: "One Offs", component: OneOffsForm },
     { slug: "income-tax", name: "Income Tax", component: IncomeTaxForm },
     { slug: "assumptions", name: "Assumptions", component: AssumptionsForm },

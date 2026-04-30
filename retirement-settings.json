@@ -48,7 +48,7 @@
       "annualAmount": 60000
     }
   ],
-  "retirementIncome": [
+  "incomeStreams": [
     {
       "id": "1777449541772",
       "description": "Caro pension",

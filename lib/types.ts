@@ -36,6 +36,8 @@ export interface Assumptions {
     taxBandIncreaseRate?: number
     categoryGrowthRates: Record<string, number>
     bedAndISAEnabled?: boolean
+    // Annual ISA allowance per person (default £20000)
+    annualISAAllowance?: number
     // Master toggle to enable/disable ISA investment balance glide path
     investmentBalanceEnabled?: boolean
     // Optional ISA investment balance glide path (equity/bond split over time)
@@ -57,17 +59,34 @@ export interface MarketShock {
     enabled?: boolean
 }
 
-export interface RetirementIncome {
+export interface IncomeStream {
     id: string
     description: string
     annualAmount: number
-    startYear: number
-    endYear?: number // Added optional ending year
+    /**
+     * Year the income stream begins. Optional; defaults to the current year when
+     * not specified at projection time.
+     */
+    startYear?: number
+    /** Optional explicit end year. Ignored when {@link endsAtRetirement} is true. */
+    endYear?: number
+    /**
+     * When true the income stream ends automatically when the owner reaches their
+     * retirement year. {@link endYear} is cleared in the UI in this case and the
+     * effective end year is computed at projection time.
+     */
+    endsAtRetirement?: boolean
     enabled: boolean
     inflationAdjusted: boolean
-    growthRate?: number // Added optional custom growth rate (could be on top of inflation)
+    growthRate?: number // Optional custom growth rate (could be on top of inflation)
     belongsToSpouse?: boolean
 }
+
+/**
+ * @deprecated Use {@link IncomeStream}. Kept as an alias to preserve any
+ * lingering external references during the rename.
+ */
+export type RetirementIncome = IncomeStream
 
 export interface OneOff {
     id: string
@@ -82,7 +101,7 @@ export interface RetirementData {
     personal: PersonalInfo
     assets: Asset[]
     incomeNeeds: IncomeNeed[]
-    retirementIncome: RetirementIncome[]
+    incomeStreams: IncomeStream[]
     assumptions: Assumptions
     incomeTax: TaxSettings // Added income tax settings
     shocks: MarketShock[]
@@ -123,8 +142,8 @@ export interface PoolYear {
     initialPosition: AssetPool
     income: {
         statePension: number
-        // Non-state pension income (e.g. DB pensions, salary). Previously called
-        // `retirementIncome` in the projection output.
+        // Non-state pension income (e.g. DB pensions, salary). Sourced from
+        // the configured income streams.
         otherIncome: number
     }
     // Positive reductions only. `withdrawals.cash` includes cash spent on

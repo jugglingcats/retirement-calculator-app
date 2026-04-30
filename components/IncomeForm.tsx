@@ -1,73 +1,50 @@
 "use client"
 
 import { useState } from "react"
-import { RetirementData, RetirementIncome } from "@/lib/types"
+import { IncomeStream, RetirementData } from "@/lib/types"
 
 interface Props {
     data: RetirementData
     setData: (data: RetirementData) => void
 }
 
-export default function RetirementIncomeForm({ data, setData }: Props) {
-    const [newIncome, setNewIncome] = useState<RetirementIncome>({
-        id: "",
-        description: "",
-        annualAmount: 0,
-        startYear: new Date().getFullYear(),
-        endYear: undefined,
-        enabled: true,
-        inflationAdjusted: true,
-        growthRate: undefined,
-        belongsToSpouse: false
-    })
+const emptyIncome = (): IncomeStream => ({
+    id: "",
+    description: "",
+    annualAmount: 0,
+    startYear: undefined,
+    endYear: undefined,
+    endsAtRetirement: false,
+    enabled: true,
+    inflationAdjusted: true,
+    growthRate: undefined,
+    belongsToSpouse: false
+})
+
+export default function IncomeForm({ data, setData }: Props) {
+    const [newIncome, setNewIncome] = useState<IncomeStream>(emptyIncome())
 
     const [editingId, setEditingId] = useState<string | null>(null)
-    const [editingData, setEditingData] = useState<RetirementIncome | null>(null)
+    const [editingData, setEditingData] = useState<IncomeStream | null>(null)
+
+    const currentYear = new Date().getFullYear()
 
     const addIncome = (e: React.FormEvent) => {
         e.preventDefault()
         if (newIncome.description && newIncome.annualAmount > 0) {
             setData({
                 ...data,
-                retirementIncome: [...data.retirementIncome, { ...newIncome, id: Date.now().toString() }]
+                incomeStreams: [...data.incomeStreams, { ...newIncome, id: Date.now().toString() }]
             })
-            setNewIncome({
-                id: "",
-                description: "",
-                annualAmount: 0,
-                startYear: new Date().getFullYear(),
-                endYear: undefined,
-                enabled: true,
-                inflationAdjusted: true,
-                growthRate: undefined,
-                belongsToSpouse: false
-            })
+            setNewIncome(emptyIncome())
         }
     }
 
     const toggleEnabled = (id: string) => {
         setData({
             ...data,
-            retirementIncome: data.retirementIncome.map(income =>
+            incomeStreams: data.incomeStreams.map(income =>
                 income.id === id ? { ...income, enabled: !income.enabled } : income
-            )
-        })
-    }
-
-    const toggleInflation = (id: string) => {
-        setData({
-            ...data,
-            retirementIncome: data.retirementIncome.map(income =>
-                income.id === id ? { ...income, inflationAdjusted: !income.inflationAdjusted } : income
-            )
-        })
-    }
-
-    const updateIncome = (id: string, field: keyof RetirementIncome, value: any) => {
-        setData({
-            ...data,
-            retirementIncome: data.retirementIncome.map(income =>
-                income.id === id ? { ...income, [field]: value } : income
             )
         })
     }
@@ -75,11 +52,11 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
     const deleteIncome = (id: string) => {
         setData({
             ...data,
-            retirementIncome: data.retirementIncome.filter(income => income.id !== id)
+            incomeStreams: data.incomeStreams.filter(income => income.id !== id)
         })
     }
 
-    const startEditing = (income: RetirementIncome) => {
+    const startEditing = (income: IncomeStream) => {
         setEditingId(income.id)
         setEditingData({ ...income })
     }
@@ -93,7 +70,7 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
         if (editingData) {
             setData({
                 ...data,
-                retirementIncome: data.retirementIncome.map(income => (income.id === editingId ? editingData : income))
+                incomeStreams: data.incomeStreams.map(income => (income.id === editingId ? editingData : income))
             })
             setEditingId(null)
             setEditingData(null)
@@ -103,9 +80,10 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
     return (
         <div className="flex flex-col gap-8">
             <p className="text-gray-600 text-sm">
-                Define benefit pensions, annuities, and other guaranteed income sources. Enter the annual amount in
-                today&apos;s money and specify when it starts. You can choose whether each income should increase with
-                inflation or use a custom growth rate. You can also estimate the year when the income will end.
+                Define income streams across your working life and retirement: salaries, defined-benefit pensions,
+                annuities, rental income, and so on. Enter the annual amount in today&apos;s money. Starting year is
+                optional and defaults to the current year. Tick &quot;Ends at retirement&quot; for pre-retirement income
+                (e.g. salary) — its end year is computed automatically from the retirement year.
             </p>
 
             <form
@@ -116,7 +94,7 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                     <label className="font-semibold text-gray-700 text-sm">Description</label>
                     <input
                         type="text"
-                        placeholder="e.g., Company Pension"
+                        placeholder="e.g., Salary, Company Pension"
                         value={newIncome.description}
                         onChange={e => setNewIncome({ ...newIncome, description: e.target.value })}
                         required
@@ -137,18 +115,17 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="font-semibold text-gray-700 text-sm">Starting Year</label>
+                    <label className="font-semibold text-gray-700 text-sm">Starting Year (optional)</label>
                     <input
                         type="number"
-                        placeholder="2030"
-                        value={newIncome.startYear || ""}
+                        placeholder={`${currentYear}`}
+                        value={newIncome.startYear ?? ""}
                         onChange={e =>
                             setNewIncome({
                                 ...newIncome,
-                                startYear: parseInt(e.target.value) || new Date().getFullYear()
+                                startYear: e.target.value ? parseInt(e.target.value) : undefined
                             })
                         }
-                        required
                         className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
                     />
                 </div>
@@ -157,15 +134,16 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                     <label className="font-semibold text-gray-700 text-sm">Ending Year (optional)</label>
                     <input
                         type="number"
-                        placeholder="Never ends"
-                        value={newIncome.endYear || ""}
+                        placeholder={newIncome.endsAtRetirement ? "At retirement" : "Never ends"}
+                        value={newIncome.endsAtRetirement ? "" : newIncome.endYear ?? ""}
+                        disabled={newIncome.endsAtRetirement}
                         onChange={e =>
                             setNewIncome({
                                 ...newIncome,
                                 endYear: e.target.value ? parseInt(e.target.value) : undefined
                             })
                         }
-                        className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                        className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors disabled:bg-gray-100 disabled:text-gray-400"
                     />
                 </div>
 
@@ -199,30 +177,53 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                     </div>
                 </div>
 
-                <div className="md:col-span-6 flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        id="newIncomeBelongsToSpouse"
-                        checked={newIncome.belongsToSpouse || false}
-                        onChange={e => setNewIncome({ ...newIncome, belongsToSpouse: e.target.checked })}
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <label htmlFor="newIncomeBelongsToSpouse" className="text-sm font-medium text-gray-700">
-                        Belongs to partner
-                    </label>
+                <div className="md:col-span-6 flex flex-wrap items-center gap-6">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="newIncomeEndsAtRetirement"
+                            checked={newIncome.endsAtRetirement || false}
+                            onChange={e =>
+                                setNewIncome({
+                                    ...newIncome,
+                                    endsAtRetirement: e.target.checked,
+                                    // Clear any explicit endYear when enabling — it will be
+                                    // derived from the retirement year at projection time.
+                                    endYear: e.target.checked ? undefined : newIncome.endYear
+                                })
+                            }
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <label htmlFor="newIncomeEndsAtRetirement" className="text-sm font-medium text-gray-700">
+                            Ends at retirement
+                        </label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="newIncomeBelongsToSpouse"
+                            checked={newIncome.belongsToSpouse || false}
+                            onChange={e => setNewIncome({ ...newIncome, belongsToSpouse: e.target.checked })}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <label htmlFor="newIncomeBelongsToSpouse" className="text-sm font-medium text-gray-700">
+                            Belongs to partner
+                        </label>
+                    </div>
                 </div>
 
                 <button
                     type="submit"
                     className="md:col-span-6 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
                 >
-                    Add Retirement Income
+                    Add Income Stream
                 </button>
             </form>
 
-            {data.retirementIncome.length > 0 && (
+            {data.incomeStreams.length > 0 && (
                 <div className="flex flex-col gap-4">
-                    {data.retirementIncome.map(income => {
+                    {data.incomeStreams.map(income => {
                         const isEditing = editingId === income.id
                         const displayData = isEditing ? editingData! : income
 
@@ -278,14 +279,19 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-sm font-medium text-gray-700">Starting Year</label>
+                                            <label className="text-sm font-medium text-gray-700">
+                                                Starting Year (optional)
+                                            </label>
                                             <input
                                                 type="number"
-                                                value={displayData.startYear}
+                                                placeholder={`${currentYear}`}
+                                                value={displayData.startYear ?? ""}
                                                 onChange={e =>
                                                     setEditingData({
                                                         ...editingData!,
-                                                        startYear: parseInt(e.target.value) || new Date().getFullYear()
+                                                        startYear: e.target.value
+                                                            ? parseInt(e.target.value)
+                                                            : undefined
                                                     })
                                                 }
                                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
@@ -295,15 +301,20 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                             <label className="text-sm font-medium text-gray-700">Ending Year</label>
                                             <input
                                                 type="number"
-                                                placeholder="Never ends"
-                                                value={displayData.endYear || ""}
+                                                placeholder={
+                                                    displayData.endsAtRetirement ? "At retirement" : "Never ends"
+                                                }
+                                                value={
+                                                    displayData.endsAtRetirement ? "" : displayData.endYear ?? ""
+                                                }
+                                                disabled={displayData.endsAtRetirement}
                                                 onChange={e =>
                                                     setEditingData({
                                                         ...editingData!,
                                                         endYear: e.target.value ? parseInt(e.target.value) : undefined
                                                     })
                                                 }
-                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-400"
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">
@@ -342,25 +353,50 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                                 />
                                             </div>
                                         </div>
-                                        <div className="md:col-span-5 flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                id={`editIncomeBelongsToSpouse-${income.id}`}
-                                                checked={displayData.belongsToSpouse || false}
-                                                onChange={e =>
-                                                    setEditingData({
-                                                        ...editingData!,
-                                                        belongsToSpouse: e.target.checked
-                                                    })
-                                                }
-                                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                                            />
-                                            <label
-                                                htmlFor={`editIncomeBelongsToSpouse-${income.id}`}
-                                                className="text-sm font-medium text-gray-700"
-                                            >
-                                                Belongs to partner
-                                            </label>
+                                        <div className="md:col-span-5 flex flex-wrap items-center gap-6">
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`editIncomeEndsAtRetirement-${income.id}`}
+                                                    checked={displayData.endsAtRetirement || false}
+                                                    onChange={e =>
+                                                        setEditingData({
+                                                            ...editingData!,
+                                                            endsAtRetirement: e.target.checked,
+                                                            endYear: e.target.checked
+                                                                ? undefined
+                                                                : editingData!.endYear
+                                                        })
+                                                    }
+                                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                                />
+                                                <label
+                                                    htmlFor={`editIncomeEndsAtRetirement-${income.id}`}
+                                                    className="text-sm font-medium text-gray-700"
+                                                >
+                                                    Ends at retirement
+                                                </label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`editIncomeBelongsToSpouse-${income.id}`}
+                                                    checked={displayData.belongsToSpouse || false}
+                                                    onChange={e =>
+                                                        setEditingData({
+                                                            ...editingData!,
+                                                            belongsToSpouse: e.target.checked
+                                                        })
+                                                    }
+                                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                                />
+                                                <label
+                                                    htmlFor={`editIncomeBelongsToSpouse-${income.id}`}
+                                                    className="text-sm font-medium text-gray-700"
+                                                >
+                                                    Belongs to partner
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -374,7 +410,10 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                         <div>
                                             <label className="block text-xs text-gray-500 mb-1">Period</label>
                                             <div className="text-sm text-gray-700">
-                                                {displayData.startYear} - {displayData.endYear || "Ongoing"}
+                                                {displayData.startYear ?? currentYear} -{" "}
+                                                {displayData.endsAtRetirement
+                                                    ? "Retirement"
+                                                    : displayData.endYear || "Ongoing"}
                                             </div>
                                         </div>
                                         <div>
@@ -391,7 +430,12 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
                                                 {displayData.inflationAdjusted ? "Adjusted" : "Fixed"}
                                             </div>
                                         </div>
-                                        <div>
+                                        <div className="flex flex-wrap gap-2 items-start">
+                                            {displayData.endsAtRetirement && (
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                                    Ends at retirement
+                                                </span>
+                                            )}
                                             {displayData.belongsToSpouse && (
                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                                     Spouse
@@ -441,12 +485,13 @@ export default function RetirementIncomeForm({ data, setData }: Props) {
             )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2">About Retirement Income</h3>
+                <h3 className="font-semibold text-blue-900 mb-2">About Income Streams</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Enter defined benefit pensions, annuities, or other guaranteed income</li>
+                    <li>• Model income before and after retirement (salary, pensions, annuities, rentals…)</li>
                     <li>• Amounts are in today&apos;s money</li>
                     <li>• Set a custom growth rate or use inflation adjustment</li>
-                    <li>• Specify an ending year if the income will cease (e.g., term annuities)</li>
+                    <li>• Tick &quot;Ends at retirement&quot; for pre-retirement income — the end year is computed from the retirement year</li>
+                    <li>• Specify an explicit ending year for fixed-term income (e.g. term annuities)</li>
                     <li>• Use the checkbox to enable/disable income sources in your calculations</li>
                     <li>• UK State Pension is calculated separately based on your personal info</li>
                 </ul>

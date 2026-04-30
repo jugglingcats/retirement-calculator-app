@@ -6,15 +6,10 @@ import {
     AssetPoolType,
     AssetType,
     Assumptions,
-    DrawdownStrategyType,
     IncomeNeed,
-    RetirementIncome,
-    TaxSettings
+    IncomeStream
 } from "@/lib/types"
-import { BaseDrawdownStrategy } from "@/lib/strategies/base"
-import { BalancedStrategy } from "@/lib/strategies/strategyBalanced"
-import { LowestGrowthFirstStrategy } from "@/lib/strategies/strategyLowestGrowthFirst"
-import { TaxOptimizedStrategy } from "@/lib/strategies/strategyTaxOptimized"
+
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs))
@@ -146,48 +141,41 @@ export function buildStatePensions(age: number, spouseAge: number, inflationMult
 }
 
 export function buildOtherIncome(
-    incomeSources: RetirementIncome[],
+    incomeSources: IncomeStream[],
     year: number,
-    inflationMultiplier: number
+    inflationMultiplier: number,
+    options: {
+        currentYear: number
+        /** Retirement year per pool: index 0 = primary, index 1 = spouse. */
+        retirementYears: [number, number]
+    }
 ): number[] {
     if (!incomeSources) {
         return [0, 0]
     }
+    const { currentYear, retirementYears } = options
     return incomeSources.reduce(
         (acc, income) => {
-            if (income.enabled && year >= income.startYear && (!income.endYear || year <= income.endYear)) {
-                const growthRate = income.growthRate || 0
-                const inflation_multiplier = income.inflationAdjusted ? inflationMultiplier : 1
-                const growth_multiplier = Math.pow(1 + growthRate / 100, year - income.startYear)
-                const amount = income.annualAmount * inflation_multiplier * growth_multiplier
+            if (!income.enabled) return acc
 
-                if (income.belongsToSpouse) {
-                    acc[AssetPoolType.SPOUSE] += amount
-                } else {
-                    acc[AssetPoolType.PRIMARY] += amount
-                }
-            }
+            const ownerIdx = income.belongsToSpouse ? AssetPoolType.SPOUSE : AssetPoolType.PRIMARY
+            const effectiveStartYear = income.startYear ?? currentYear
+            const effectiveEndYear = income.endsAtRetirement
+                ? retirementYears[ownerIdx] - 1
+                : income.endYear
+
+            if (year < effectiveStartYear) return acc
+            if (effectiveEndYear !== undefined && year > effectiveEndYear) return acc
+
+            const growthRate = income.growthRate || 0
+            const inflation_multiplier = income.inflationAdjusted ? inflationMultiplier : 1
+            const growth_multiplier = Math.pow(1 + growthRate / 100, year - effectiveStartYear)
+            const amount = income.annualAmount * inflation_multiplier * growth_multiplier
+
+            acc[ownerIdx] += amount
             return acc
         },
         [0, 0]
     )
 }
-/**
- * Factory function to create the appropriate strategy instance.
- */
-export function createDrawdownStrategy(
-    strategyType: DrawdownStrategyType,
-    taxSettings: TaxSettings,
-    growthRates: AssetPool
-): BaseDrawdownStrategy {
-    switch (strategyType) {
-        case "balanced":
-            return new BalancedStrategy(taxSettings, growthRates)
-        case "lowest_growth_first":
-            return new LowestGrowthFirstStrategy(taxSettings, growthRates)
-        case "tax_optimized":
-            return new TaxOptimizedStrategy(taxSettings, growthRates)
-        default:
-            throw new Error(`Unknown strategy type: ${strategyType}`)
-    }
-}
+

@@ -13,7 +13,7 @@ export const defaultRetirementData: RetirementData = {
     },
     assets: [],
     incomeNeeds: [],
-    retirementIncome: [],
+    incomeStreams: [],
     assumptions: {
         inflationRate: 2.5,
         categoryGrowthRates: {},
@@ -46,7 +46,12 @@ export function useRetirementData(): [RetirementData, (data: RetirementData) => 
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData)
-                if (!parsedData.retirementIncome) parsedData.retirementIncome = []
+                // Migrate legacy `retirementIncome` key to `incomeStreams`.
+                if (parsedData.retirementIncome && !parsedData.incomeStreams) {
+                    parsedData.incomeStreams = parsedData.retirementIncome
+                    delete parsedData.retirementIncome
+                }
+                if (!parsedData.incomeStreams) parsedData.incomeStreams = []
                 if (!parsedData.oneOffs) parsedData.oneOffs = []
                 if (!parsedData.incomeTax) {
                     parsedData.incomeTax = {

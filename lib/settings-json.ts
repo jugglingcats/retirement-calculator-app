@@ -15,15 +15,18 @@ export const exportSettings = (data: RetirementData) => {
 }
 
 export const parseSettings = (text: string): RetirementData => {
-    const parsed = JSON.parse(text) as Partial<RetirementData>
+    const parsed = JSON.parse(text) as Partial<RetirementData> & { retirementIncome?: unknown }
     if (!parsed || typeof parsed !== "object" || !parsed.personal) {
         throw new Error("Invalid settings file")
     }
+    // Migrate legacy `retirementIncome` key to `incomeStreams`.
+    const incomeStreams =
+        parsed.incomeStreams ?? (parsed.retirementIncome as RetirementData["incomeStreams"] | undefined) ?? []
     return {
         personal: parsed.personal as RetirementData["personal"],
         assets: parsed.assets ?? [],
         incomeNeeds: parsed.incomeNeeds ?? [],
-        retirementIncome: parsed.retirementIncome ?? [],
+        incomeStreams,
         assumptions: parsed.assumptions ?? {
             inflationRate: 2.5,
             categoryGrowthRates: {},

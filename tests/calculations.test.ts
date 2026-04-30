@@ -24,7 +24,7 @@ function baseData(overrides: Partial<RetirementData> = {}): RetirementData {
             { id: "pr", name: "Property", value: 0, category: AssetType.Property }
         ],
         incomeNeeds: [{ id: "need", description: "Base need", annualAmount: 0, startingAge: 60 }],
-        retirementIncome: [],
+        incomeStreams: [],
         assumptions: {
             inflationRate: 0,
             categoryGrowthRates: {
@@ -220,7 +220,7 @@ describe("calculateProjection", () => {
                 { id: "pr", name: "Property", value: 0, category: AssetType.Property }
             ],
             incomeNeeds: [{ id: "need", description: "Need", annualAmount: 500, startingAge: 60 }],
-            retirementIncome: [
+            incomeStreams: [
                 {
                     id: "ri",
                     description: "Payout",
@@ -315,7 +315,7 @@ describe("calculateProjection", () => {
                 { id: "pr", name: "Property", value: 0, category: AssetType.Property }
             ],
             incomeNeeds: [{ id: "need", description: "Need", annualAmount: 10000, startingAge: 60 }],
-            retirementIncome: [
+            incomeStreams: [
                 {
                     id: "ri1",
                     description: "My Pension",

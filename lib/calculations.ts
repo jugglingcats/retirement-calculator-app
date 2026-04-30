@@ -4,7 +4,6 @@ import {
     buildBaseCgtCostPools,
     buildOtherIncome,
     buildStatePensions,
-    createDrawdownStrategy,
     createEmptyAssetPool,
     getNetExpenditure,
     growthRateFor,
@@ -12,6 +11,7 @@ import {
     isTaxable,
     sumNumbers
 } from "@/lib/utils"
+import { createDrawdownStrategy } from "@/lib/strategyFactory"
 import {
     AssetPool,
     AssetType,
@@ -35,7 +35,7 @@ export function calculateProjection(
 ): ProjectionResult {
     console.clear()
 
-    const { personal, assets, shocks, assumptions, incomeTax, incomeNeeds, retirementIncome, oneOffs } = data
+    const { personal, assets, shocks, assumptions, incomeTax, incomeNeeds, incomeStreams, oneOffs } = data
 
     const currentYear = new Date().getFullYear()
     const birthYear = new Date(personal.dateOfBirth).getFullYear()
@@ -54,6 +54,13 @@ export function calculateProjection(
     const baseCostPools = buildBaseCgtCostPools(assets)
 
     const spouseBirthYear = personal.spouseDateOfBirth ? new Date(personal.spouseDateOfBirth).getFullYear() : null
+
+    // Per-pool retirement year used for income streams that end at retirement.
+    // The configured retirementAge applies to both members of the household; if
+    // no spouse is configured we fall back to the primary's retirement year.
+    const primaryRetirementYear = birthYear + retirementAge
+    const spouseRetirementYear = (spouseBirthYear ?? birthYear) + retirementAge
+    const retirementYears: [number, number] = [primaryRetirementYear, spouseRetirementYear]
 
     let runsOutAt: number = 0
 
@@ -92,7 +99,10 @@ export function calculateProjection(
         const initialPosition: AssetPool[] = assetPools.map(a => ({ ...a }))
 
         const statePensionIncome = buildStatePensions(age, spouseAge, inflationMultiplier)
-        const otherIncome = buildOtherIncome(retirementIncome, year, inflationMultiplier)
+        const otherIncome = buildOtherIncome(incomeStreams, year, inflationMultiplier, {
+            currentYear,
+            retirementYears
+        })
 
         const taxableIncome = statePensionIncome.map((pension, i) => pension + otherIncome[i])
 

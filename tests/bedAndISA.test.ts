@@ -24,7 +24,7 @@ function baseData(overrides: Partial<RetirementData> = {}): RetirementData {
             { id: "pr", name: "Property", value: 0, category: AssetType.Property }
         ],
         incomeNeeds: [{ id: "need", description: "Base need", annualAmount: 0, startingAge: 65 }],
-        retirementIncome: [],
+        incomeStreams: [],
         assumptions: {
             inflationRate: 0,
             categoryGrowthRates: {
