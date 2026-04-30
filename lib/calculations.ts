@@ -25,7 +25,7 @@ import { sumPool } from "@/lib/yearlyView"
 import { calculateCGT, CGTWithdrawal, initialTaxPosition, updateTaxPosition } from "@/lib/tax"
 import { applyBedAndISAToPensions, applyBedAndISAToStocks } from "@/lib/annual/bedAndIsa"
 import { applyOneOffs } from "@/lib/annual/oneOffs"
-import { applyMarketShock } from "@/lib/annual/marketShock"
+import { applyMarketShocks } from "@/lib/annual/marketShock"
 import { applyGrowth } from "@/lib/annual/growth"
 
 export function calculateProjection(
@@ -60,7 +60,7 @@ export function calculateProjection(
     const spouseBirthYear =
         includePartner && personal.spouseDateOfBirth ? new Date(personal.spouseDateOfBirth).getFullYear() : null
     // Partner's retirement age defaults to the primary's when unset.
-    const spouseRetirementAge = includePartner ? personal.spouseRetirementAge ?? retirementAge : retirementAge
+    const spouseRetirementAge = includePartner ? (personal.spouseRetirementAge ?? retirementAge) : retirementAge
 
     // Per-pool retirement year used for income streams that end at retirement, and
     // for the ISA glide path. When no partner is configured we fall back to the
@@ -95,6 +95,10 @@ export function calculateProjection(
         const spouseAge = year - (spouseBirthYear || Number.NaN)
         const ages = [age, spouseAge]
 
+        applyMarketShocks(
+            assetPools,
+            shocks.filter(s => s.year === year && s.enabled !== false)
+        )
         // Bed and ISA process runs at the start of each year for eligible individuals.
         // First convert taxable stocks into ISA (utilising the CGT allowance, optionally
         // gifting between spouses), then use any remaining ISA allowance to crystallise
@@ -107,10 +111,6 @@ export function calculateProjection(
 
         applyGrowth(assetPools, assumptions, ages, retirementAges)
         applyOneOffs(assetPools, oneOffs, ages, inflationMultiplier)
-        applyMarketShock(
-            assetPools,
-            shocks.find(s => s.year === year && s.enabled !== false)
-        )
 
         // Snapshot the post-growth, pre-drawdown position. This is the position the
         // drawdown strategy sees. End-of-year balances are derived as
@@ -239,8 +239,8 @@ export function calculateProjection(
         const netSurplus = Math.max(0, baseTaxableIncome - expenditure - totalTaxThisYear - totalCGTThisYear)
         if (netSurplus > 0 && baseTaxableIncome > 0) {
             surplusToDeposit = [
-                netSurplus * taxableIncome[0] / baseTaxableIncome,
-                netSurplus * taxableIncome[1] / baseTaxableIncome
+                (netSurplus * taxableIncome[0]) / baseTaxableIncome,
+                (netSurplus * taxableIncome[1]) / baseTaxableIncome
             ]
         }
 
