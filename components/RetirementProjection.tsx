@@ -436,7 +436,7 @@ export default function RetirementProjection({ data, setData }: Props) {
                     {strategy === "tax_optimized" ? (
                         <>
                             <strong>Minimise higher-rate tax:</strong> Use ISA first up to the 40% threshold; then draw
-                            taxable income in order Cash â†’ Pension â†’ Property.
+                            taxable income in order Cash → Pension → Property.
                         </>
                     ) : (
                         <>

@@ -22,8 +22,8 @@ export class TaxOptimizedStrategy extends BaseDrawdownStrategy {
             AssetType.Cash,
             AssetType.Bonds,
             AssetType.StocksAndShares,
-            AssetType.Pension,
             AssetType.PensionCrystallised,
+            AssetType.Pension,
             AssetType.Property
         ]
 

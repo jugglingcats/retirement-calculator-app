@@ -11,7 +11,7 @@ import {
     isTaxable,
     sumNumbers
 } from "@/lib/utils"
-import { createDrawdownStrategy } from "@/lib/strategyFactory"
+import { createDrawdownStrategy } from "@/lib/strategies/strategyFactory"
 import {
     AssetPool,
     AssetType,
