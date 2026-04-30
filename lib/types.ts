@@ -27,7 +27,7 @@ export interface IncomeNeed {
     id: string
     description: string
     annualAmount: number
-    startingAge?: number // If empty, defaults to retirement age
+    startingAge?: number // If empty, defaults to current age
 }
 
 export interface Assumptions {
@@ -81,12 +81,6 @@ export interface IncomeStream {
     growthRate?: number // Optional custom growth rate (could be on top of inflation)
     belongsToSpouse?: boolean
 }
-
-/**
- * @deprecated Use {@link IncomeStream}. Kept as an alias to preserve any
- * lingering external references during the rename.
- */
-export type RetirementIncome = IncomeStream
 
 export interface OneOff {
     id: string

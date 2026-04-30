@@ -106,13 +106,13 @@ export function calculateProjection(
 
         const taxableIncome = statePensionIncome.map((pension, i) => pension + otherIncome[i])
 
-        // Calculate expenditure
+        // Calculate expenditure — applicable from the income need's own startingAge
+        // (defaults to current age). getNetExpenditure returns undefined when no need
+        // is active yet (i.e. age < the earliest effectiveStartingAge).
         let expenditure = 0
-        if (age >= retirementAge) {
-            const applicableNeed = getNetExpenditure(incomeNeeds, retirementAge, age)
-            if (applicableNeed) {
-                expenditure = applicableNeed.annualAmount * inflationMultiplier
-            }
+        const applicableNeed = getNetExpenditure(incomeNeeds, currentAge, age)
+        if (applicableNeed) {
+            expenditure = applicableNeed.annualAmount * inflationMultiplier
         }
 
         const baseTaxableIncome = sumNumbers(taxableIncome)
@@ -130,7 +130,7 @@ export function calculateProjection(
             pool.cash = Math.max(0, pool.cash)
         })
 
-        if (age >= retirementAge) {
+        if (expenditure > 0) {
             // Initial tax liability is handled in `execute` method, so just include the initial cash liability here
             const shortfall = expenditure - baseTaxableIncome + initialCashLiability
 
@@ -240,7 +240,7 @@ export function calculateProjection(
         const totalCGTPayable = cgtResults[0].cgtPayable + cgtResults[1].cgtPayable
         const totalWithdrawalsSum = sumPool(withdrawalsDetailPerPool[0]) + sumPool(withdrawalsDetailPerPool[1])
         const netResourcesForSpending = baseTaxableIncome + totalWithdrawalsSum - totalTaxPayable - totalCGTPayable
-        const computedShortfall = age >= retirementAge ? Math.max(0, expenditure - netResourcesForSpending) : 0
+        const computedShortfall = expenditure > 0 ? Math.max(0, expenditure - netResourcesForSpending) : 0
 
         yearlyData.push({
             year,
@@ -250,7 +250,7 @@ export function calculateProjection(
             shortfall: computedShortfall
         })
 
-        if (currentTotalAssets <= 0 && !runsOutAt && age >= retirementAge) {
+        if (currentTotalAssets <= 0 && !runsOutAt && expenditure > 0) {
             runsOutAt = year
         }
     }

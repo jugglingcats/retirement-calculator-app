@@ -78,11 +78,11 @@ export function sumAssets(assets: AssetPool): number {
 export function sumNumbers(numbers: number[]) {
     return numbers.reduce((sum, n) => sum + n, 0)
 }
-export function getNetExpenditure(incomeNeeds: IncomeNeed[], retirementAge: number, age: number) {
+export function getNetExpenditure(incomeNeeds: IncomeNeed[], currentAge: number, age: number) {
     const sortedNeeds = incomeNeeds
         .map(need => ({
             ...need,
-            effectiveStartingAge: need.startingAge ?? retirementAge
+            effectiveStartingAge: need.startingAge ?? currentAge
         }))
         .sort((a, b) => b.effectiveStartingAge - a.effectiveStartingAge)
 

@@ -19,6 +19,10 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editingData, setEditingData] = useState<IncomeNeed | null>(null)
 
+    const currentYear = new Date().getFullYear()
+    const birthYear = data.personal.dateOfBirth ? new Date(data.personal.dateOfBirth).getFullYear() : null
+    const currentAge = birthYear !== null ? currentYear - birthYear : undefined
+
     const addNeed = (e: React.FormEvent) => {
         e.preventDefault()
         if (newNeed.description && newNeed.annualAmount > 0) {
@@ -63,7 +67,7 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
             <p className="text-gray-600 text-sm">
                 Define your income needs <b>after tax</b> at different stages of retirement. Each entry shows the annual
                 amount needed in today&apos;s money net of tax payable, and will be automatically adjusted for
-                inflation. If you don&apos;t specify a starting age, it will default to your retirement age. Often
+                inflation. If you don&apos;t specify a starting age, it will default to your current age. Often
                 people's needs decrease slightly as they get older but can increase again towards end of life.
             </p>
 
@@ -97,11 +101,11 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
 
                 <div className="flex flex-col gap-2">
                     <label className="font-semibold text-gray-700 text-sm">
-                        Starting Age (defaults to retirement age)
+                        Starting Age (defaults to current age)
                     </label>
                     <input
                         type="number"
-                        placeholder={data.personal.retirementAge?.toString() || "65"}
+                        placeholder={currentAge !== undefined ? `${currentAge}` : "Current age"}
                         value={newNeed.startingAge || ""}
                         onChange={e =>
                             setNewNeed({
@@ -126,11 +130,11 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
                     {[...data.incomeNeeds]
                         .sort(
                             (a, b) =>
-                                (a.startingAge || data.personal.retirementAge) -
-                                (b.startingAge || data.personal.retirementAge)
+                                (a.startingAge ?? currentAge ?? data.personal.retirementAge ?? 0) -
+                                (b.startingAge ?? currentAge ?? data.personal.retirementAge ?? 0)
                         )
                         .map(need => {
-                            const displayAge = need.startingAge || data.personal.retirementAge || 65
+                            const displayAge = need.startingAge || currentAge || data.personal.retirementAge || 0
                             const isEditing = editingId === need.id
                             const displayData = isEditing ? editingData! : need
 
@@ -183,7 +187,7 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
                                                                 : undefined
                                                         })
                                                     }
-                                                    placeholder={data.personal.retirementAge?.toString() || "65"}
+                                             placeholder={currentAge !== undefined ? `${currentAge}` : "Current age"}
                                                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                                 />
                                             </div>
@@ -196,7 +200,7 @@ export default function IncomeNeedsForm({ data, setData }: Props) {
                                                 </div>
                                                 <div className="text-sm text-gray-500">
                                                     Starting at age {displayAge}
-                                                    {!displayData.startingAge && " (retirement age)"}
+                                                    {!displayData.startingAge && " (current age)"}
                                                 </div>
                                             </div>
                                             <div className="font-semibold text-gray-900">
