@@ -60,6 +60,10 @@ export interface Assumptions {
     // Capital Gains Tax settings
     cgtAllowance?: number // Annual CGT allowance (default £3000)
     cgtRate?: number // CGT rate as percentage (default 18%)
+    // When true, all displayed values (charts, tables, Excel export) are deflated
+    // by the inflation rate so they are shown in today's money. The underlying
+    // calculation is unchanged.
+    showInTodaysMoney?: boolean
 }
 
 export interface MarketShock {

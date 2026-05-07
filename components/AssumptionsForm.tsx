@@ -54,6 +54,16 @@ export default function AssumptionsForm({ data, setData }: Props) {
         })
     }
 
+    const updateShowInTodaysMoney = (enabled: boolean) => {
+        setData({
+            ...data,
+            assumptions: {
+                ...data.assumptions,
+                showInTodaysMoney: enabled
+            }
+        })
+    }
+
     const updateBedAndISA = (enabled: boolean) => {
         setData({
             ...data,
@@ -163,6 +173,25 @@ export default function AssumptionsForm({ data, setData }: Props) {
                         <p className="text-sm text-gray-500">
                             How quickly the personal allowance and higher-rate threshold increase each year. Leave blank
                             to match the inflation rate.
+                        </p>
+                    </div>
+                </div>
+                <div className="mt-4 flex items-start gap-3">
+                    <input
+                        type="checkbox"
+                        id="showInTodaysMoney"
+                        checked={data.assumptions.showInTodaysMoney || false}
+                        onChange={e => updateShowInTodaysMoney(e.target.checked)}
+                        className="mt-1 w-5 h-5 text-indigo-600 border-2 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <div className="flex flex-col">
+                        <label htmlFor="showInTodaysMoney" className="font-semibold text-gray-700">
+                            Show projection in today's money
+                        </label>
+                        <p className="text-sm text-gray-500">
+                            Deflate all displayed values by the inflation rate so figures remain in today's purchasing
+                            power. Affects charts, tables and Excel export only — the underlying calculation is
+                            unchanged.
                         </p>
                     </div>
                 </div>

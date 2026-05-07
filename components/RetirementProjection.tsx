@@ -19,6 +19,7 @@ import { DrawdownStrategy, RetirementData } from "@/lib/types"
 import { HouseholdYearly, householdYearlySeries } from "@/lib/yearlyView"
 import YearlyBreakdownSection from "@/components/YearlyBreakdownSection"
 import { formatGBP } from "@/components/util"
+import { deflateProjection } from "@/lib/deflate"
 
 const STRATEGY_STORAGE_KEY = "retirement-calculator-drawdown-strategy"
 const VALID_STRATEGIES: DrawdownStrategy[] = ["balanced", "lowest_growth_first", "tax_optimized"]
@@ -94,7 +95,18 @@ export default function RetirementProjection({ data, setData }: Props) {
     }, [data, hasMinimumData])
 
     // Use the currently selected strategy's results for most UI elements
-    const { yearlyData, runsOutAt, currentAssets } = projections[strategy]
+    const showInTodaysMoney = data.assumptions.showInTodaysMoney
+    const displayProjections = useMemo(() => {
+        if (!showInTodaysMoney) return projections
+        const rate = data.assumptions.inflationRate || 0
+        return {
+            balanced: deflateProjection(projections.balanced, rate),
+            lowest_growth_first: deflateProjection(projections.lowest_growth_first, rate),
+            tax_optimized: deflateProjection(projections.tax_optimized, rate)
+        } as typeof projections
+    }, [projections, showInTodaysMoney, data.assumptions.inflationRate])
+
+    const { yearlyData, runsOutAt, currentAssets } = displayProjections[strategy]
 
     // Household-level series derived from the per-pool simulation output. This is what
     // the charts and the asset tooltip read from â€” `yearlyData` itself only carries the
@@ -105,13 +117,13 @@ export default function RetirementProjection({ data, setData }: Props) {
     const fixedYAxisMax = useMemo(() => {
         const maxFrom = (yds: typeof yearlyData) =>
             yds.length ? Math.max(...householdYearlySeries(yds).map(h => h.assets || 0)) : 0
-        const m1 = maxFrom(projections.balanced.yearlyData)
-        const m2 = maxFrom(projections.lowest_growth_first.yearlyData)
-        const m3 = maxFrom(projections.tax_optimized.yearlyData)
+        const m1 = maxFrom(displayProjections.balanced.yearlyData)
+        const m2 = maxFrom(displayProjections.lowest_growth_first.yearlyData)
+        const m3 = maxFrom(displayProjections.tax_optimized.yearlyData)
         const max = Math.max(0, m1, m2, m3)
         // Add a small headroom to avoid clipping the top of the stacked areas
         return Math.ceil(max * 1.05)
-    }, [projections, yearlyData])
+    }, [displayProjections, yearlyData])
     const birthYear = new Date(data.personal.dateOfBirth).getFullYear()
 
     // Custom X-axis tick to render Year on first line and Age on second line
@@ -526,7 +538,7 @@ export default function RetirementProjection({ data, setData }: Props) {
 
             {/* Yearly breakdown: per-person rows showing initial position, income, expenditure and withdrawals.
                 Same data is exported to Excel via the Download button. */}
-            <YearlyBreakdownSection data={data} projection={projections[strategy]} />
+            <YearlyBreakdownSection data={data} projection={displayProjections[strategy]} />
         </div>
     )
 }

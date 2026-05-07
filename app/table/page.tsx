@@ -6,6 +6,7 @@ import { calculateProjection } from "@/lib/calculations"
 import { DrawdownStrategy } from "@/lib/types"
 import YearlyBreakdownSection from "@/components/YearlyBreakdownSection"
 import { useRetirementData } from "@/hooks/useRetirementData"
+import { deflateProjection } from "@/lib/deflate"
 
 const STRATEGY_STORAGE_KEY = "retirement-calculator-drawdown-strategy"
 const VALID_STRATEGIES: DrawdownStrategy[] = ["balanced", "lowest_growth_first", "tax_optimized"]
@@ -45,7 +46,8 @@ export default function StandaloneTablePage() {
 
     const projection = useMemo(() => {
         if (!loaded || !data.personal.dateOfBirth || data.assets.length === 0) return null
-        return calculateProjection(data, Infinity, strategy)
+        const raw = calculateProjection(data, Infinity, strategy)
+        return data.assumptions.showInTodaysMoney ? deflateProjection(raw, data.assumptions.inflationRate || 0) : raw
     }, [data, strategy, loaded])
 
     return (
