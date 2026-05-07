@@ -105,38 +105,39 @@ export function applyBedAndISAToPensions(
 
     const crystallisationMultiplier = 1 / TAX_FREE_LUMP_SUM_PERCENTAGE // 4
 
-    for (let i = 0; i < 2; i++) {
-        if (!eligibility[i]) continue
-        if (remainingISAAllowance[i] <= 0) continue
-
-        const targetCrystallisation = remainingISAAllowance[i] * crystallisationMultiplier
-
-        const ownPool = assetPools[i]
-        const otherPool = assetPools[1 - i]
-
-        const availableFromOwn = ownPool[AssetType.Pension]
-        const availableFromOther = otherPool[AssetType.Pension]
-
-        const crystallisedFromOwn = Math.min(availableFromOwn, targetCrystallisation)
-        const remainingToFill = targetCrystallisation - crystallisedFromOwn
-
-        let crystallisedFromOther = 0
-        if (remainingToFill > 0 && availableFromOther > 0) {
-            crystallisedFromOther = Math.min(availableFromOther, remainingToFill)
+    /**
+     * Crystallise from `pensionOwnerIdx`'s pension to fill `isaOwnerIdx`'s
+     * remaining ISA allowance. The 25% tax-free lump sum lands in the ISA
+     * owner's ISA; the 75% remainder stays in the pension owner's
+     * crystallised pension pool (no inter-person leakage of pension assets).
+     */
+    const crystalliseFor = (pensionOwnerIdx: number, isaOwnerIdx: number) => {
+        if (!eligibility[isaOwnerIdx]) {
+            return
+        }
+        if (remainingISAAllowance[isaOwnerIdx] <= 0) {
+            return
         }
 
-        const totalCrystallised = crystallisedFromOwn + crystallisedFromOther
-        if (totalCrystallised === 0) continue
+        const pensionPool = assetPools[pensionOwnerIdx]
+        const available = pensionPool[AssetType.Pension]
+        if (available <= 0) return
 
-        const taxFreeLumpSum = totalCrystallised * TAX_FREE_LUMP_SUM_PERCENTAGE
-        const toCrystallisedPension = totalCrystallised * (1 - TAX_FREE_LUMP_SUM_PERCENTAGE)
+        const targetCrystallisation = remainingISAAllowance[isaOwnerIdx] * crystallisationMultiplier
+        const crystallised = Math.min(available, targetCrystallisation)
 
-        ownPool[AssetType.Pension] -= crystallisedFromOwn
-        ownPool[AssetType.ISA] += taxFreeLumpSum
-        ownPool[AssetType.PensionCrystallised] += toCrystallisedPension
+        const taxFreeLumpSum = crystallised * TAX_FREE_LUMP_SUM_PERCENTAGE
+        const toCrystallisedPension = crystallised - taxFreeLumpSum
 
-        if (crystallisedFromOther > 0) {
-            otherPool[AssetType.Pension] -= crystallisedFromOther
-        }
+        pensionPool[AssetType.Pension] -= crystallised
+        pensionPool[AssetType.PensionCrystallised] += toCrystallisedPension
+        assetPools[isaOwnerIdx][AssetType.ISA] += taxFreeLumpSum
+        remainingISAAllowance[isaOwnerIdx] -= taxFreeLumpSum
+    }
+
+    // Each person's pension fills their own ISA first, then their partner's.
+    for (let pensionOwnerIdx = 0; pensionOwnerIdx < 2; pensionOwnerIdx++) {
+        crystalliseFor(pensionOwnerIdx, pensionOwnerIdx)
+        crystalliseFor(pensionOwnerIdx, 1 - pensionOwnerIdx)
     }
 }
