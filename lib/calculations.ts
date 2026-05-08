@@ -99,15 +99,6 @@ export function calculateProjection(
             assetPools,
             shocks.filter(s => s.year === year && s.enabled !== false)
         )
-        // Bed and ISA process runs at the start of each year for eligible individuals.
-        // First convert taxable stocks into ISA (utilising the CGT allowance, optionally
-        // gifting between spouses), then use any remaining ISA allowance to crystallise
-        // pension (age 55+) and take the 25% tax-free lump sum into ISA.
-        if (assumptions.bedAndISAEnabled) {
-            const hasSpouse = !isNaN(spouseAge)
-            const remainingISAAllowance = applyBedAndISAToStocks(assetPools, baseCostPools, assumptions, hasSpouse)
-            applyBedAndISAToPensions(assetPools, ages, remainingISAAllowance)
-        }
 
         applyGrowth(assetPools, assumptions, ages, retirementAges)
         applyOneOffs(assetPools, oneOffs, ages, inflationMultiplier)
@@ -166,15 +157,25 @@ export function calculateProjection(
             }
         }
 
-        // Compute withdrawals by pool and by asset class (positive reductions only).
+        // Bed and ISA process runs at the end of each year.
+        if (assumptions.bedAndISAEnabled) {
+            const hasSpouse = !isNaN(spouseAge)
+            const remainingISAAllowance = applyBedAndISAToStocks(assetPools, baseCostPools, assumptions, hasSpouse)
+            applyBedAndISAToPensions(assetPools, ages, remainingISAAllowance)
+        }
+
+        // Compute withdrawals by pool and by asset class. Diffs may be negative
+        // when the strategy moves value *into* an asset type (e.g. pension
+        // crystallisation pushes the 75% remainder into PensionCrystallised);
+        // recording the negative diff preserves the invariant
+        //   endPosition[t] = initialPosition[t] - withdrawals[t].
         // At this point cash has already been debited for the drawdown itself but not yet
         // for income tax / CGT — those are folded in below so that the final withdrawal map
         // equals `initialPosition - endingBalances` exactly.
         const withdrawalsDetailPerPool: [AssetPool, AssetPool] = [createEmptyAssetPool(), createEmptyAssetPool()]
         for (let i = 0; i < 2; i++) {
             for (const type of assetTypes) {
-                const diff = initialPosition[i][type] - assetPools[i][type]
-                withdrawalsDetailPerPool[i][type] = diff > 0 ? diff : 0
+                withdrawalsDetailPerPool[i][type] = initialPosition[i][type] - assetPools[i][type]
             }
         }
 

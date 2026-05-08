@@ -1,8 +1,11 @@
-import { AssetDrawdownResult, AssetPool, AuditEntry, TaxPosition, TaxSettings } from "@/lib/types"
+import { AssetDrawdownResult, AssetPool, AssetType, AuditEntry, TaxPosition, TaxSettings } from "@/lib/types"
 import { sumAssets, sumNumbers } from "@/lib/utils"
 import { updateTaxPosition } from "@/lib/tax"
 
 const fmt = (n: number) => `£${Math.round(n).toLocaleString("en-GB")}`
+
+/** Proportion of a crystallised pension that can be taken as a tax-free lump sum. */
+const TAX_FREE_LUMP_SUM_PERCENTAGE = 0.25
 
 /**
  * Base class for drawdown strategies. Handles common tax calculation logic
@@ -49,6 +52,54 @@ export abstract class BaseDrawdownStrategy {
         })
 
         let drawnSoFar = 0
+
+        // Step 0: Before splitting the shortfall across pools, attempt to fund it
+        // by crystallising uncrystallised pension assets in pool order. Each £X
+        // crystallised yields £X * 25% as a tax-free lump sum (which counts toward
+        // the shortfall) and moves the remaining 75% into the crystallised pension
+        // pool (where it remains available as a taxable drawdown if still needed).
+        const requiredForCrystallisation = shortfall + initialTax
+        if (requiredForCrystallisation > 0.01) {
+            for (let i = 0; i < assetPools.length; i++) {
+                const remainingNeed = requiredForCrystallisation - drawnSoFar
+                if (remainingNeed <= 0.01) break
+
+                const pool = assetPools[i]
+                const pensionAvail = Math.max(0, pool[AssetType.Pension])
+                if (pensionAvail <= 0) continue
+
+                // To raise £remainingNeed tax-free we must crystallise remainingNeed / 0.25.
+                const targetCrystallisation = Math.min(
+                    pensionAvail,
+                    remainingNeed / TAX_FREE_LUMP_SUM_PERCENTAGE
+                )
+                const taxFreeLumpSum = targetCrystallisation * TAX_FREE_LUMP_SUM_PERCENTAGE
+                const toCrystallised = targetCrystallisation - taxFreeLumpSum
+
+                pool[AssetType.Pension] -= targetCrystallisation
+                pool[AssetType.PensionCrystallised] += toCrystallised
+                drawnSoFar += taxFreeLumpSum
+
+                const personLabel = assetPools.length > 1 ? (i === 0 ? "Me" : "Partner") : "Pool"
+                audit.push({
+                    stage: "crystallisation",
+                    message:
+                        `${personLabel}: crystallised ${fmt(targetCrystallisation)} of pension → ` +
+                        `${fmt(taxFreeLumpSum)} tax-free lump sum applied to shortfall, ` +
+                        `${fmt(toCrystallised)} retained in crystallised pension pool.`
+                })
+            }
+
+            if (drawnSoFar > 0) {
+                audit.push({
+                    stage: "crystallisation",
+                    message:
+                        `Pension crystallisation funded ${fmt(drawnSoFar)} tax-free toward required ` +
+                        `${fmt(requiredForCrystallisation)} (shortfall + existing tax).`
+                })
+            }
+        }
+
         let count = 0
         const MAX_ITER = 15
         while (count++ < MAX_ITER) {
