@@ -3,15 +3,11 @@
 import { Fragment, useMemo, useState } from "react"
 import { calculateProjection } from "@/lib/calculations"
 import { RetirementData } from "@/lib/types"
-import {
-    BreakdownGroup,
-    BreakdownRow,
-    GROUP_LABELS,
-    buildYearlyBreakdown,
-    personLabel
-} from "@/lib/yearlyExport"
+import { BreakdownGroup, BreakdownRow, GROUP_LABELS, buildYearlyBreakdown, personLabel } from "@/lib/yearlyExport"
 import { downloadYearlyExcel } from "@/lib/yearlyExcelExport"
 import { formatGBP } from "@/components/util"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { AuditEntry } from "@/lib/types"
 
 interface Props {
     data: RetirementData
@@ -156,15 +152,13 @@ export default function YearlyBreakdownSection({ data, projection, containerClas
                                 Person
                             </th>
                             {breakdown.years.map(y => (
-                                <th
-                                    key={`year-${y.year}`}
-                                    className="text-right px-2 py-1 border-b whitespace-nowrap"
-                                >
-                                    <div>{y.year}</div>
-                                    <div className="text-xs font-normal text-gray-500">
-                                        Age {y.age}
-                                        {breakdown.hasSpouse && y.spouseAge !== undefined ? ` / ${y.spouseAge}` : ""}
-                                    </div>
+                                <th key={`year-${y.year}`} className="text-right px-2 py-1 border-b whitespace-nowrap">
+                                    <YearHeader
+                                        year={y.year}
+                                        age={y.age}
+                                        spouseAge={breakdown.hasSpouse ? y.spouseAge : undefined}
+                                        audit={y.audit}
+                                    />
                                 </th>
                             ))}
                         </tr>
@@ -197,5 +191,102 @@ export default function YearlyBreakdownSection({ data, projection, containerClas
                 </table>
             </div>
         </div>
+    )
+}
+
+const STAGE_LABELS: Record<string, string> = {
+    setup: "Setup",
+    iteration: "Iteration",
+    withdrawal: "Withdrawal",
+    "tax-update": "Tax update",
+    summary: "Summary"
+}
+
+function YearHeader({
+    year,
+    age,
+    spouseAge,
+    audit
+}: {
+    year: number
+    age: number
+    spouseAge?: number
+    audit?: AuditEntry[]
+}) {
+    const ageLine = (
+        <div className="text-xs font-normal text-gray-500">
+            Age {age}
+            {spouseAge !== undefined ? ` / ${spouseAge}` : ""}
+        </div>
+    )
+
+    if (!audit || audit.length === 0) {
+        return (
+            <>
+                <div>{year}</div>
+                {ageLine}
+            </>
+        )
+    }
+
+    // Group entries by stage, preserving the order each stage first appears.
+    const stagesInOrder: string[] = []
+    const grouped: Record<string, AuditEntry[]> = {}
+    for (const e of audit) {
+        if (!(e.stage in grouped)) {
+            grouped[e.stage] = []
+            stagesInOrder.push(e.stage)
+        }
+        grouped[e.stage].push(e)
+    }
+
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className="cursor-pointer text-right hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5 group"
+                    aria-label={`Drawdown audit for ${year}`}
+                >
+                    <div className="flex items-center justify-end gap-1">
+                        <span>{year}</span>
+                        {/*
+                        <span
+                            aria-hidden
+                            className="text-[10px] text-gray-400 group-hover:text-blue-600"
+                            title="Drawdown audit available"
+                        >
+                            ⓘ
+                        </span>
+*/}
+                    </div>
+                    {ageLine}
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[28rem] max-h-[28rem] overflow-auto text-left">
+                <div className="mb-2">
+                    <div className="text-sm font-semibold text-gray-900">Drawdown audit — {year}</div>
+                    <div className="text-xs text-gray-500">
+                        Age {age}
+                        {spouseAge !== undefined ? ` / ${spouseAge}` : ""} · {audit.length} entr
+                        {audit.length === 1 ? "y" : "ies"}
+                    </div>
+                </div>
+                <div className="space-y-3">
+                    {stagesInOrder.map(stage => (
+                        <div key={stage}>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-gray-700">
+                                {STAGE_LABELS[stage] ?? stage}
+                            </div>
+                            <ul className="mt-1 space-y-1 text-xs text-gray-800 list-disc pl-5">
+                                {grouped[stage].map((e, i) => (
+                                    <li key={i}>{e.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+            </PopoverContent>
+        </Popover>
     )
 }

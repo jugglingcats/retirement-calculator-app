@@ -1,4 +1,4 @@
-import { AssetPoolType, AssetType, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
+import { AssetPoolType, AssetType, AuditEntry, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
 import { ASSET_LABELS, ASSET_TYPES_IN_ORDER } from "@/lib/yearlyView"
 
 // Re-export the shared display helpers so callers that already import from this
@@ -15,6 +15,8 @@ export interface BreakdownYearColumn {
     age: number
     /** Partner's age in this year, if a partner is configured. */
     spouseAge?: number
+    /** Per-year drawdown strategy audit log, if any. */
+    audit?: AuditEntry[]
 }
 
 export interface BreakdownRow {
@@ -92,7 +94,8 @@ export function buildYearlyBreakdown(data: RetirementData, projection: Projectio
     const years: BreakdownYearColumn[] = yds.map(yd => ({
         year: yd.year,
         age: yd.age,
-        spouseAge: hasSpouse && spouseBirthYear !== null ? yd.year - spouseBirthYear : undefined
+        spouseAge: hasSpouse && spouseBirthYear !== null ? yd.year - spouseBirthYear : undefined,
+        audit: yd.audit
     }))
 
     // Determine which asset types appear in initial positions vs withdrawals.

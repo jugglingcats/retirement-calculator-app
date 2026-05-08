@@ -15,7 +15,7 @@ import {
 } from "recharts"
 import { calculateProjection } from "@/lib/calculations"
 import { useEffect, useMemo, useState } from "react"
-import { DrawdownStrategy, RetirementData } from "@/lib/types"
+import { DrawdownStrategy, ProjectionResult, RetirementData } from "@/lib/types"
 import { HouseholdYearly, householdYearlySeries } from "@/lib/yearlyView"
 import YearlyBreakdownSection from "@/components/YearlyBreakdownSection"
 import { formatGBP } from "@/components/util"
@@ -78,32 +78,32 @@ export default function RetirementProjection({ data, setData }: Props) {
     const hasMinimumData = Boolean(data.personal.dateOfBirth) && data.assets.length > 0
     const projections = useMemo(() => {
         if (!hasMinimumData) {
-            const empty = { yearlyData: [], runsOutAt: null, currentAssets: 0 } as unknown as ReturnType<
-                typeof calculateProjection
-            >
+            const empty: ProjectionResult = { yearlyData: [], runsOutAt: 0, currentAssets: 0, totalNeeded: 0 }
             return {
                 balanced: empty,
                 lowest_growth_first: empty,
                 tax_optimized: empty
-            } as Record<DrawdownStrategy, ReturnType<typeof calculateProjection>>
+            } as Record<DrawdownStrategy, ProjectionResult>
         }
         return {
             balanced: calculateProjection(data, Infinity, "balanced"),
             lowest_growth_first: calculateProjection(data, Infinity, "lowest_growth_first"),
             tax_optimized: calculateProjection(data, Infinity, "tax_optimized")
-        } as Record<DrawdownStrategy, ReturnType<typeof calculateProjection>>
+        } as Record<DrawdownStrategy, ProjectionResult>
     }, [data, hasMinimumData])
 
     // Use the currently selected strategy's results for most UI elements
     const showInTodaysMoney = data.assumptions.showInTodaysMoney
     const displayProjections = useMemo(() => {
-        if (!showInTodaysMoney) return projections
+        if (!showInTodaysMoney) {
+            return projections
+        }
         const rate = data.assumptions.inflationRate || 0
         return {
             balanced: deflateProjection(projections.balanced, rate),
             lowest_growth_first: deflateProjection(projections.lowest_growth_first, rate),
             tax_optimized: deflateProjection(projections.tax_optimized, rate)
-        } as typeof projections
+        }
     }, [projections, showInTodaysMoney, data.assumptions.inflationRate])
 
     const { yearlyData, runsOutAt, currentAssets } = displayProjections[strategy]

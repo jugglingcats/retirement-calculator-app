@@ -137,6 +137,21 @@ export interface AssetDrawdownResult {
 }
 
 /**
+ * A single human-readable audit entry produced by a drawdown strategy. Entries
+ * are produced as the strategy makes decisions (sorting, choosing assets,
+ * withdrawing, recomputing tax) and are surfaced in the UI so users can
+ * inspect the reasoning behind each year's drawdown.
+ */
+export interface AuditEntry {
+    /** High-level phase, e.g. "setup", "iteration", "withdrawal", "tax-update", "summary". */
+    stage: string
+    /** Human-readable message. */
+    message: string
+    /** Optional structured data for debugging. Not displayed prominently. */
+    data?: Record<string, unknown>
+}
+
+/**
  * Single per-person view of one simulated year.
  *
  * `initialPosition` captures the per-person asset balances *after* start-of-year
@@ -180,6 +195,12 @@ export type YearlyDatapoint = {
     expenditure: number
     // Unmet expenditure for the year, when assets and income are insufficient.
     shortfall: number
+    /**
+     * Per-year audit log of drawdown strategy decisions. Populated only in years
+     * where the drawdown strategy is invoked (i.e. when there is a shortfall).
+     * Not persisted — purely for inspection in the UI.
+     */
+    audit?: AuditEntry[]
 }
 export type ProjectionResult = {
     yearlyData: YearlyDatapoint[]

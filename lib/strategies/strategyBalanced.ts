@@ -1,12 +1,17 @@
 import { BaseDrawdownStrategy } from "@/lib/strategies/base"
-import { AssetPool, AssetDrawdownResult, AssetType } from "@/lib/types"
+import { AssetPool, AssetDrawdownResult, AssetType, AuditEntry } from "@/lib/types"
 import { isTaxable } from "@/lib/utils"
+import { ASSET_LABELS } from "@/lib/yearlyView"
+
+const fmt = (n: number) => `£${Math.round(n).toLocaleString("en-GB")}`
 
 /**
  * Balanced strategy - draws proportionally from all asset types.
  */
 export class BalancedStrategy extends BaseDrawdownStrategy {
-    public withdrawFromAssets(assets: AssetPool, amount: number): AssetDrawdownResult {
+    public readonly name = "Balanced"
+
+    public withdrawFromAssets(assets: AssetPool, amount: number, _tax?: unknown, audit?: AuditEntry[]): AssetDrawdownResult {
         if (amount <= 0) {
             return {
                 remaining: 0,
@@ -18,6 +23,10 @@ export class BalancedStrategy extends BaseDrawdownStrategy {
         const totalAssets = assetTypes.reduce((sum, type) => sum + Math.max(0, assets[type]), 0)
 
         if (totalAssets <= 0) {
+            audit?.push({
+                stage: "withdrawal",
+                message: `Balanced: pool is empty, cannot withdraw ${fmt(amount)}.`
+            })
             return {
                 remaining: amount,
                 taxableWithdrawn: 0
@@ -47,6 +56,16 @@ export class BalancedStrategy extends BaseDrawdownStrategy {
             }
         }
 
+        audit?.push({
+            stage: "withdrawal",
+            message:
+                `Balanced: splitting ${fmt(amount)} proportionally across pool of ${fmt(totalAssets)} → ` +
+                assetTypes
+                    .filter(t => withdrawals[t] > 0)
+                    .map(t => `${ASSET_LABELS[t]} ${fmt(withdrawals[t])} (${((withdrawals[t] / amount) * 100).toFixed(0)}%)`)
+                    .join(", ") + "."
+        })
+
         // Apply withdrawals
         for (const type of assetTypes) {
             const withdrawal = withdrawals[type]
@@ -60,17 +79,26 @@ export class BalancedStrategy extends BaseDrawdownStrategy {
         // If there's still remaining (due to rounding or insufficient proportional funds),
         // take from whatever is available
         if (remaining > 0.01) {
+            audit?.push({
+                stage: "withdrawal",
+                message: `Balanced: top-up sweep needed for ${fmt(remaining)} (rounding / insufficient proportional funds).`
+            })
             for (const type of assetTypes) {
                 if (remaining <= 0) {
                     break
                 }
                 const available = Math.max(0, assets[type])
+                if (available <= 0) continue
                 const withdrawal = Math.min(remaining, available)
                 assets[type] -= withdrawal
                 remaining -= withdrawal
                 if (isTaxable(type)) {
                     taxableWithdrawn += withdrawal
                 }
+                audit?.push({
+                    stage: "withdrawal",
+                    message: `Balanced: top-up took ${fmt(withdrawal)} from ${ASSET_LABELS[type]}.`
+                })
             }
         }
 

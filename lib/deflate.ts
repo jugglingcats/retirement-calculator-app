@@ -41,7 +41,8 @@ function deflateYear(y: YearlyDatapoint, baseYear: number, inflationRatePercent:
         age: y.age,
         pools: [deflatePoolYear(y.pools[0], factor), deflatePoolYear(y.pools[1], factor)],
         expenditure: y.expenditure * factor,
-        shortfall: y.shortfall * factor
+        shortfall: y.shortfall * factor,
+        audit: y.audit
     }
 }
 

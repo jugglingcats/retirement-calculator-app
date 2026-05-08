@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { AssetPool, AssetDrawdownResult, TaxSettings, AssetType } from "@/lib/types"
+import { AssetPool, AssetDrawdownResult, AuditEntry, TaxSettings, AssetType } from "@/lib/types"
 import { BalancedStrategy } from "@/lib/strategies/strategyBalanced"
 import { LowestGrowthFirstStrategy } from "@/lib/strategies/strategyLowestGrowthFirst"
 import { TaxOptimizedStrategy } from "@/lib/strategies/strategyTaxOptimized"
@@ -168,6 +168,66 @@ describe("balanced strategy", () => {
         const withdrawn = performDrawdown(assets, 10000, growthRates, "balanced")
 
         expect(withdrawn).toBe(0)
+    })
+})
+
+describe("strategy audit log", () => {
+    it("BalancedStrategy populates audit entries via execute()", () => {
+        const assets: AssetPool = createAssets({
+            [AssetType.Cash]: 50000,
+            [AssetType.ISA]: 50000
+        })
+        const growthRates = createGrowthRates()
+        const audit: AuditEntry[] = []
+        const taxPositions = [
+            { personalAllowanceRemaining: 0, basicRateRemaining: 0, tax: 0 },
+            { personalAllowanceRemaining: 0, basicRateRemaining: 0, tax: 0 }
+        ]
+        new BalancedStrategy(DEFAULT_TAX_SETTINGS, growthRates).execute([assets, createAssets()], 10000, taxPositions, audit)
+
+        const stages = new Set(audit.map(e => e.stage))
+        expect(stages.has("setup")).toBe(true)
+        expect(stages.has("iteration")).toBe(true)
+        expect(stages.has("withdrawal")).toBe(true)
+        expect(stages.has("summary")).toBe(true)
+        // Messages are human-readable (non-empty strings).
+        expect(audit.every(e => typeof e.message === "string" && e.message.length > 0)).toBe(true)
+    })
+
+    it("LowestGrowthFirstStrategy emits a withdrawal entry mentioning the chosen asset", () => {
+        const assets = createAssets({
+            [AssetType.Cash]: 50000,
+            [AssetType.StocksAndShares]: 50000
+        })
+        const audit: AuditEntry[] = []
+        new LowestGrowthFirstStrategy(DEFAULT_TAX_SETTINGS, createGrowthRates()).withdrawFromAssets(
+            assets,
+            10000,
+            { personalAllowanceRemaining: 0, basicRateRemaining: 0, tax: 0 },
+            audit
+        )
+        const text = audit.map(e => e.message).join(" | ")
+        expect(text).toMatch(/Cash/)
+        expect(text).toMatch(/sorted/i)
+    })
+
+    it("TaxOptimizedStrategy mentions the basic-rate band room in setup", () => {
+        const assets = createAssets({
+            [AssetType.Cash]: 50000,
+            [AssetType.ISA]: 50000
+        })
+        const audit: AuditEntry[] = []
+        new TaxOptimizedStrategy(
+            { personalAllowance: 12500, higherRateThreshold: 50270 },
+            createGrowthRates()
+        ).withdrawFromAssets(
+            assets,
+            10000,
+            { personalAllowanceRemaining: 12500, basicRateRemaining: 30000, tax: 0 },
+            audit
+        )
+        const text = audit.map(e => e.message).join(" | ")
+        expect(text).toMatch(/higher-rate threshold/)
     })
 })
 

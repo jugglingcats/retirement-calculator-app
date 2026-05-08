@@ -14,6 +14,7 @@ import { createDrawdownStrategy } from "@/lib/strategies/strategyFactory"
 import {
     AssetPool,
     AssetType,
+    AuditEntry,
     DrawdownStrategy,
     PoolYear,
     ProjectionResult,
@@ -147,6 +148,10 @@ export function calculateProjection(
             pool.cash = Math.max(0, pool.cash)
         })
 
+        // Per-year audit log of strategy decisions; populated only when the
+        // drawdown strategy runs (i.e. when there is a shortfall).
+        const audit: AuditEntry[] = []
+
         if (expenditure > 0) {
             // Initial tax liability is handled in `execute` method, so just include the initial cash liability here
             const shortfall = expenditure - baseTaxableIncome + initialCashLiability
@@ -157,7 +162,7 @@ export function calculateProjection(
                 ) as AssetPool
 
                 const strategyInstance = createDrawdownStrategy(strategy, incomeTax, growthRates)
-                strategyInstance.execute(assetPools, shortfall, taxPosition)
+                strategyInstance.execute(assetPools, shortfall, taxPosition, audit)
             }
         }
 
@@ -266,7 +271,8 @@ export function calculateProjection(
             age,
             pools,
             expenditure,
-            shortfall: computedShortfall
+            shortfall: computedShortfall,
+            audit
         })
 
         if (currentTotalAssets <= 0 && !runsOutAt && expenditure > 0) {
