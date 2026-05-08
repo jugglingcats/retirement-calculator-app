@@ -170,7 +170,15 @@ export function buildOtherIncome(
             const growthRate = income.growthRate || 0
             const inflation_multiplier = income.inflationAdjusted ? inflationMultiplier : 1
             const growth_multiplier = Math.pow(1 + growthRate / 100, year - effectiveStartYear)
-            const amount = income.annualAmount * inflation_multiplier * growth_multiplier
+            let amount = income.annualAmount * inflation_multiplier * growth_multiplier
+
+            // Apply optional cap. The limit is specified in today's money and
+            // rises with inflation so it represents a constant real-terms cap,
+            // independent of the stream's own inflationAdjusted/growthRate.
+            if (income.limit !== undefined && income.limit !== null) {
+                const cap = income.limit * inflationMultiplier
+                if (amount > cap) amount = cap
+            }
 
             acc[ownerIdx] += amount
             return acc

@@ -94,6 +94,13 @@ export interface IncomeStream {
     enabled: boolean
     inflationAdjusted: boolean
     growthRate?: number // Optional custom growth rate (could be on top of inflation)
+    /**
+     * Optional cap on the annual income, expressed in today's money. When set,
+     * the income for this stream cannot exceed this limit regardless of the
+     * year, growth rate, or inflation adjustment. The cap itself rises with
+     * inflation so it represents a constant amount in real (today's) terms.
+     */
+    limit?: number
     belongsToSpouse?: boolean
 }
 

@@ -19,6 +19,7 @@ const emptyIncome = (): IncomeStream => ({
     enabled: true,
     inflationAdjusted: true,
     growthRate: undefined,
+    limit: undefined,
     belongsToSpouse: false
 })
 
@@ -89,7 +90,7 @@ export default function IncomeForm({ data, setData }: Props) {
 
             <form
                 onSubmit={addIncome}
-                className="grid grid-cols-1 md:grid-cols-6 gap-4 p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300"
+                className="grid grid-cols-1 md:grid-cols-7 gap-4 p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300"
             >
                 <div className="flex flex-col gap-2">
                     <label className="font-semibold text-gray-700 text-sm">Description</label>
@@ -115,7 +116,7 @@ export default function IncomeForm({ data, setData }: Props) {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="font-semibold text-gray-700 text-sm">Starting Year (optional)</label>
+                    <label className="font-semibold text-gray-700 text-sm">Starting Year</label>
                     <input
                         type="number"
                         placeholder={`${currentYear}`}
@@ -135,7 +136,7 @@ export default function IncomeForm({ data, setData }: Props) {
                     <input
                         type="number"
                         placeholder={newIncome.endsAtRetirement ? "At retirement" : "Never ends"}
-                        value={newIncome.endsAtRetirement ? "" : newIncome.endYear ?? ""}
+                        value={newIncome.endsAtRetirement ? "" : (newIncome.endYear ?? "")}
                         disabled={newIncome.endsAtRetirement}
                         onChange={e =>
                             setNewIncome({
@@ -148,7 +149,7 @@ export default function IncomeForm({ data, setData }: Props) {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <label className="font-semibold text-gray-700 text-sm">Growth Rate (%) (optional)</label>
+                    <label className="font-semibold text-gray-700 text-sm">Growth Rate (%)</label>
                     <input
                         type="number"
                         placeholder="Use inflation"
@@ -165,6 +166,21 @@ export default function IncomeForm({ data, setData }: Props) {
                 </div>
 
                 <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-gray-700 text-sm">Limit</label>
+                    <NumericInput
+                        placeholder="No cap"
+                        value={newIncome.limit ?? null}
+                        onChange={v =>
+                            setNewIncome({
+                                ...newIncome,
+                                limit: v === null || v === 0 ? undefined : v
+                            })
+                        }
+                        className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
+                    />
+                </div>
+
+                <div className="flex flex-col gap-2">
                     <label className="font-semibold text-gray-700 text-sm">Inflation Adjusted</label>
                     <div className="flex items-center h-full">
                         <input
@@ -177,7 +193,7 @@ export default function IncomeForm({ data, setData }: Props) {
                     </div>
                 </div>
 
-                <div className="md:col-span-6 flex flex-wrap items-center gap-6">
+                <div className="md:col-span-7 flex flex-wrap items-center gap-6">
                     <div className="flex items-center gap-2">
                         <input
                             type="checkbox"
@@ -215,7 +231,7 @@ export default function IncomeForm({ data, setData }: Props) {
 
                 <button
                     type="submit"
-                    className="md:col-span-6 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
+                    className="md:col-span-7 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold hover:-translate-y-0.5 transition-transform"
                 >
                     Add Income Stream
                 </button>
@@ -261,7 +277,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                 </div>
 
                                 {isEditing ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
                                         <div className="flex flex-col gap-2">
                                             <label className="text-sm font-medium text-gray-700">
                                                 Annual Amount (£)
@@ -278,9 +294,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-sm font-medium text-gray-700">
-                                                Starting Year (optional)
-                                            </label>
+                                            <label className="text-sm font-medium text-gray-700">Starting Year</label>
                                             <input
                                                 type="number"
                                                 placeholder={`${currentYear}`}
@@ -288,9 +302,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                                 onChange={e =>
                                                     setEditingData({
                                                         ...editingData!,
-                                                        startYear: e.target.value
-                                                            ? parseInt(e.target.value)
-                                                            : undefined
+                                                        startYear: e.target.value ? parseInt(e.target.value) : undefined
                                                     })
                                                 }
                                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
@@ -303,9 +315,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                                 placeholder={
                                                     displayData.endsAtRetirement ? "At retirement" : "Never ends"
                                                 }
-                                                value={
-                                                    displayData.endsAtRetirement ? "" : displayData.endYear ?? ""
-                                                }
+                                                value={displayData.endsAtRetirement ? "" : (displayData.endYear ?? "")}
                                                 disabled={displayData.endsAtRetirement}
                                                 onChange={e =>
                                                     setEditingData({
@@ -317,7 +327,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-sm font-medium text-gray-700">Growth Rate (%)</label>
+                                            <label className="text-sm font-medium text-gray-700">Growth Rate</label>
                                             <input
                                                 type="number"
                                                 placeholder="Use inflation"
@@ -332,6 +342,22 @@ export default function IncomeForm({ data, setData }: Props) {
                                                 }
                                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                                 step="0.1"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-sm font-medium text-gray-700">
+                                                Limit (today&apos;s moneyx)
+                                            </label>
+                                            <NumericInput
+                                                placeholder="No cap"
+                                                value={displayData.limit ?? null}
+                                                onChange={v =>
+                                                    setEditingData({
+                                                        ...editingData!,
+                                                        limit: v === null || v === 0 ? undefined : v
+                                                    })
+                                                }
+                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">
@@ -352,7 +378,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                                 />
                                             </div>
                                         </div>
-                                        <div className="md:col-span-5 flex flex-wrap items-center gap-6">
+                                        <div className="md:col-span-6 flex flex-wrap items-center gap-6">
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="checkbox"
@@ -362,9 +388,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                                         setEditingData({
                                                             ...editingData!,
                                                             endsAtRetirement: e.target.checked,
-                                                            endYear: e.target.checked
-                                                                ? undefined
-                                                                : editingData!.endYear
+                                                            endYear: e.target.checked ? undefined : editingData!.endYear
                                                         })
                                                     }
                                                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
@@ -399,7 +423,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
                                         <div>
                                             <label className="block text-xs text-gray-500 mb-1">Annual Amount</label>
                                             <div className="font-semibold text-gray-900">
@@ -421,6 +445,14 @@ export default function IncomeForm({ data, setData }: Props) {
                                                 {displayData.growthRate !== undefined
                                                     ? `${displayData.growthRate}% p.a.`
                                                     : "Uses inflation"}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">Limit</label>
+                                            <div className="text-sm text-gray-700">
+                                                {displayData.limit !== undefined && displayData.limit !== null
+                                                    ? `£${displayData.limit.toLocaleString()} (xtoday's money)`
+                                                    : "No cap"}
                                             </div>
                                         </div>
                                         <div>
@@ -489,7 +521,14 @@ export default function IncomeForm({ data, setData }: Props) {
                     <li>• Model income before and after retirement (salary, pensions, annuities, rentals…)</li>
                     <li>• Amounts are in today&apos;s money</li>
                     <li>• Set a custom growth rate or use inflation adjustment</li>
-                    <li>• Tick &quot;Ends at retirement&quot; for pre-retirement income — the end year is computed from the retirement year</li>
+                    <li>
+                        • Optionally set a Limit (in today&apos;s money) to cap the income — the cap rises with
+                        inflation, so it stays constant in real terms
+                    </li>
+                    <li>
+                        • Tick &quot;Ends at retirement&quot; for pre-retirement income — the end year is computed from
+                        the retirement year
+                    </li>
                     <li>• Specify an explicit ending year for fixed-term income (e.g. term annuities)</li>
                     <li>• Use the checkbox to enable/disable income sources in your calculations</li>
                     <li>• UK State Pension is calculated separately based on your personal info</li>
