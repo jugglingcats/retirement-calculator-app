@@ -8,7 +8,6 @@ import {
     getNetExpenditure,
     growthRateFor,
     isCGTLiable,
-    isTaxable,
     sumNumbers
 } from "@/lib/utils"
 import { createDrawdownStrategy } from "@/lib/strategies/strategyFactory"
@@ -142,8 +141,6 @@ export function calculateProjection(
             taxPosition[i] = updateTaxPosition(taxableIncome[i], p)
         })
 
-        const initialTaxLiability = taxPosition.map(p => p.tax)
-
         const initialCashLiability = -sumNumbers(assetPools.map(pool => Math.min(0, pool.cash)))
         assetPools.forEach(pool => {
             // Ensure cash pool non-negative (negative cash is added to shortfall)
@@ -176,23 +173,10 @@ export function calculateProjection(
             }
         }
 
-        const taxableWithdrawals = assetPools.map((pool, i) => {
-            return assetTypes
-                .filter(type => isTaxable(type))
-                .reduce((sum, type) => sum + initialPosition[i][type] - pool[type], 0)
-        })
-
-        taxableWithdrawals.forEach((taxable, i) => {
-            taxPosition[i] = updateTaxPosition(taxable, taxPosition[i])
-        })
-
-        // Settle additional income tax (over what was implicitly paid during drawdown)
-        // out of cash, and reflect it in the recorded cash withdrawal.
-        assetPools.forEach((pool, i) => {
-            const additionalTax = taxPosition[i].tax - initialTaxLiability[i]
-            pool.cash -= additionalTax
-            withdrawalsDetailPerPool[i].cash += additionalTax
-        })
+        // Income tax on taxable withdrawals is now folded into `taxPosition`
+        // by the drawdown strategy itself, which iteratively tops up the
+        // drawdown to fund the resulting tax. No additional cash debit or
+        // tax-position update is required here.
 
         // Calculate CGT for withdrawals from CGT-liable assets (stocks, bonds)
         const cgtWithdrawalsPerPool: CGTWithdrawal[][] = assetPools.map((pool, i) => {

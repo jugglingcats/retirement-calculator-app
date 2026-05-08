@@ -343,4 +343,40 @@ describe("calculateProjection", () => {
         // Income covers expenditure, no tax should be due (both under personal allowance)
         expect(first.taxPayable).toBe(0)
     })
+
+    it("conserves the cashflow identity each year (income + drawdown + shortfall = expenditure + tax + CGT)", () => {
+        // Reproduces a bug where additional income tax incurred by taxable
+        // pension drawdowns was debited from cash, pushing it negative. The
+        // negative cash carried over to the following year's `initialCashLiability`,
+        // inflating that year's reported asset drawdown — effectively double-counting
+        // the income tax on the chart.
+        const thisYear = fixedNow.getFullYear()
+        const data = baseData({
+            personal: {
+                dateOfBirth: `${thisYear - 70}-01-01`,
+                spouseDateOfBirth: "",
+                retirementAge: 70
+            },
+            assets: [
+                { id: "c", name: "Cash", value: 0, category: AssetType.Cash },
+                { id: "i", name: "ISA", value: 0, category: AssetType.ISA },
+                { id: "p", name: "Pension", value: 1_000_000, category: AssetType.Pension },
+                { id: "pr", name: "Property", value: 0, category: AssetType.Property }
+            ],
+            incomeNeeds: [{ id: "need", description: "Need", annualAmount: 30000, startingAge: 70 }],
+            incomeTax: { personalAllowance: 12570, higherRateThreshold: 50270 },
+            assumptions: {
+                inflationRate: 0,
+                categoryGrowthRates: { Cash: 0, "Stocks & Shares": 0, Pensions: 0, Property: 0 }
+            }
+        })
+        const result = calculateProjection(data, 5)
+        expect(result.yearlyData.length).toBeGreaterThan(1)
+        for (const yd of result.yearlyData) {
+            const h = hh(yd)
+            const inflows = h.statePension + h.otherIncome + h.assetWithdrawals + h.shortfall
+            const outflows = h.expenditure + h.taxPayable + h.cgtPayable
+            expect(inflows).toBeCloseTo(outflows, 1)
+        }
+    })
 })
