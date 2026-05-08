@@ -1,10 +1,15 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { calculateProjection } from "@/lib/calculations"
-import { AssetPoolType, RetirementData } from "@/lib/types"
-import { buildYearlyExportTable } from "@/lib/yearlyExport"
-import { ASSET_LABELS } from "@/lib/yearlyView"
+import { RetirementData } from "@/lib/types"
+import {
+    BreakdownGroup,
+    BreakdownRow,
+    GROUP_LABELS,
+    buildYearlyBreakdown,
+    personLabel
+} from "@/lib/yearlyExport"
 import { downloadYearlyExcel } from "@/lib/yearlyExcelExport"
 import { formatGBP } from "@/components/util"
 
@@ -18,9 +23,30 @@ interface Props {
     containerClassName?: string
 }
 
+const GROUP_ORDER: BreakdownGroup[] = ["assets", "income", "withdrawals", "expenses"]
+
+const GROUP_BG: Record<BreakdownGroup, string> = {
+    assets: "bg-blue-50",
+    income: "bg-green-50",
+    withdrawals: "bg-rose-50",
+    expenses: "bg-amber-50"
+}
+const GROUP_TOTAL_BG: Record<BreakdownGroup, string> = {
+    assets: "bg-blue-100",
+    income: "bg-green-100",
+    withdrawals: "bg-rose-100",
+    expenses: "bg-amber-100"
+}
+const GROUP_HEADER_BG: Record<BreakdownGroup, string> = {
+    assets: "bg-blue-200",
+    income: "bg-green-200",
+    withdrawals: "bg-rose-200",
+    expenses: "bg-amber-200"
+}
+
 export default function YearlyBreakdownSection({ data, projection, containerClassName }: Props) {
     const [downloading, setDownloading] = useState(false)
-    const table = useMemo(() => buildYearlyExportTable(data, projection), [data, projection])
+    const breakdown = useMemo(() => buildYearlyBreakdown(data, projection), [data, projection])
 
     const handleDownload = async () => {
         try {
@@ -37,15 +63,60 @@ export default function YearlyBreakdownSection({ data, projection, containerClas
 
     const wrapperClass = containerClassName ?? "p-6 bg-white border-2 border-gray-200 rounded-lg"
 
+    // Group rows by group, preserving order.
+    const rowsByGroup: Record<BreakdownGroup, BreakdownRow[]> = {
+        assets: [],
+        income: [],
+        withdrawals: [],
+        expenses: []
+    }
+    for (const r of breakdown.rows) rowsByGroup[r.group].push(r)
+
+    const renderRow = (row: BreakdownRow, key: string) => {
+        const isTotal = !!row.isGroupTotal
+        const baseBg = isTotal ? GROUP_TOTAL_BG[row.group] : GROUP_BG[row.group]
+        return (
+            <tr key={key} className={isTotal ? "border-t border-gray-300" : ""}>
+                <td
+                    className={`sticky left-0 z-10 px-2 py-1 whitespace-nowrap ${baseBg} ${
+                        isTotal ? "font-semibold text-gray-900" : "text-gray-700"
+                    }`}
+                    style={{ minWidth: 180 }}
+                >
+                    {row.label}
+                </td>
+                <td
+                    className={`sticky left-[180px] z-10 px-2 py-1 whitespace-nowrap text-xs ${baseBg} ${
+                        isTotal ? "font-semibold text-gray-700" : "text-gray-500"
+                    }`}
+                    style={{ minWidth: 70 }}
+                >
+                    {row.person ? personLabel(row.person) : ""}
+                </td>
+                {row.values.map((v, i) => (
+                    <td
+                        key={i}
+                        className={`px-2 py-1 text-right tabular-nums whitespace-nowrap ${
+                            isTotal ? `${GROUP_TOTAL_BG[row.group]} font-semibold` : ""
+                        }`}
+                    >
+                        {fmt(v)}
+                    </td>
+                ))}
+            </tr>
+        )
+    }
+
     return (
         <div className={wrapperClass}>
             <div className="flex items-start justify-between mb-4 gap-4">
                 <div>
                     <h3 className="text-xl font-semibold text-gray-900">Yearly Breakdown</h3>
                     <p className="text-xs text-gray-500 mt-1">
-                        Two rows per year (Me / Partner): initial position at the start of the year, income by source,
-                        household expenditure, and withdrawals broken down by asset pool. Values shown to 3 significant
-                        figures; the Excel download contains exact figures with GBP formatting.
+                        One column per year, rows grouped into Income, Withdrawals and Expenses (taxes included).
+                        Per-person lines are split into Me{breakdown.hasSpouse ? " and Partner" : ""} where applicable;
+                        each group has a totals row. Values shown to 3 significant figures; the Excel download contains
+                        exact figures with GBP formatting.
                     </p>
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
@@ -71,138 +142,55 @@ export default function YearlyBreakdownSection({ data, projection, containerClas
             <div className="overflow-auto">
                 <table className="min-w-full text-sm border-collapse">
                     <thead>
-                        <tr className="bg-gray-50 text-gray-700">
-                            <th className="text-left px-2 py-2 border-b" rowSpan={2}>
-                                Year
+                        <tr className="bg-gray-100 text-gray-700">
+                            <th
+                                className="sticky left-0 z-20 bg-gray-100 text-left px-2 py-2 border-b"
+                                style={{ minWidth: 180 }}
+                            >
+                                Item
                             </th>
-                            <th className="text-left px-2 py-2 border-b" rowSpan={2}>
+                            <th
+                                className="sticky left-[180px] z-20 bg-gray-100 text-left px-2 py-2 border-b"
+                                style={{ minWidth: 70 }}
+                            >
                                 Person
                             </th>
-                            {table.visibleAssetTypes.length > 0 && (
+                            {breakdown.years.map(y => (
                                 <th
-                                    className="text-center px-2 py-2 border-b bg-blue-50"
-                                    colSpan={table.visibleAssetTypes.length + 1}
+                                    key={`year-${y.year}`}
+                                    className="text-right px-2 py-1 border-b whitespace-nowrap"
                                 >
-                                    Initial position
-                                </th>
-                            )}
-                            <th className="text-center px-2 py-2 border-b bg-green-50" colSpan={3}>
-                                Income
-                            </th>
-                            <th className="text-center px-2 py-2 border-b bg-amber-50" colSpan={4}>
-                                Expenditure
-                            </th>
-                            <th className="text-right px-2 py-2 border-b bg-violet-50" rowSpan={2}>
-                                Net Income − Expenditure
-                            </th>
-                            {table.visibleAssetTypes.length > 0 && (
-                                <th
-                                    className="text-center px-2 py-2 border-b bg-rose-50"
-                                    colSpan={table.visibleAssetTypes.length + 1}
-                                >
-                                    Withdrawals
-                                </th>
-                            )}
-                        </tr>
-                        <tr className="bg-gray-50 text-gray-700 text-xs">
-                            {table.visibleAssetTypes.map(t => (
-                                <th key={`init-${t}`} className="text-right px-2 py-1 border-b bg-blue-50">
-                                    {ASSET_LABELS[t]}
+                                    <div>{y.year}</div>
+                                    <div className="text-xs font-normal text-gray-500">
+                                        Age {y.age}
+                                        {breakdown.hasSpouse && y.spouseAge !== undefined ? ` / ${y.spouseAge}` : ""}
+                                    </div>
                                 </th>
                             ))}
-                            {table.visibleAssetTypes.length > 0 && (
-                                <th className="text-right px-2 py-1 border-b bg-blue-50">Total</th>
-                            )}
-                            <th className="text-right px-2 py-1 border-b bg-green-50">State Pension</th>
-                            <th className="text-right px-2 py-1 border-b bg-green-50">Other</th>
-                            <th className="text-right px-2 py-1 border-b bg-green-50">Total</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">Spending</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">Income Tax</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">CGT</th>
-                            <th className="text-right px-2 py-1 border-b bg-amber-50">Total</th>
-                            {table.visibleAssetTypes.map(t => (
-                                <th key={`wd-${t}`} className="text-right px-2 py-1 border-b bg-rose-50">
-                                    {ASSET_LABELS[t]}
-                                </th>
-                            ))}
-                            {table.visibleAssetTypes.length > 0 && (
-                                <th className="text-right px-2 py-1 border-b bg-rose-50">Total</th>
-                            )}
                         </tr>
                     </thead>
                     <tbody>
-                        {table.rows.map((row, idx) => {
-                            const isYearStart = row.poolIndex === AssetPoolType.PRIMARY
+                        {GROUP_ORDER.map(group => {
+                            const rows = rowsByGroup[group]
+                            if (rows.length === 0) return null
                             return (
-                                <tr
-                                    key={`${row.year}-${row.poolIndex}`}
-                                    className={`${
-                                        Math.floor(idx / 2) % 2 === 0 ? "bg-white" : "bg-gray-50"
-                                    } ${isYearStart && idx > 0 ? "border-t-2 border-gray-200" : ""}`}
-                                >
-                                    <td className="px-2 py-1 text-gray-800 whitespace-nowrap">
-                                        {isYearStart ? row.year : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-gray-700 whitespace-nowrap">{row.personLabel}</td>
-                                    {table.visibleAssetTypes.map(t => (
-                                        <td
-                                            key={`init-${row.year}-${row.poolIndex}-${t}`}
-                                            className="px-2 py-1 text-right tabular-nums whitespace-nowrap"
+                                <Fragment key={`grp-${group}`}>
+                                    <tr>
+                                        <th
+                                            className={`sticky left-0 z-20 ${GROUP_HEADER_BG[group]} text-left px-2 py-1 font-semibold text-gray-800 uppercase tracking-wide text-xs whitespace-nowrap`}
+                                            colSpan={2}
                                         >
-                                            {fmt(row.initial[t] || 0)}
-                                        </td>
-                                    ))}
-                                    {table.visibleAssetTypes.length > 0 && (
-                                        <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                            {fmt(row.initialTotal)}
-                                        </td>
-                                    )}
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {fmt(row.statePension)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {fmt(row.otherIncome)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                        {fmt(row.incomeTotal)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {isYearStart ? fmt(row.expenditure) : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {isYearStart ? fmt(row.tax) : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap">
-                                        {isYearStart ? fmt(row.cgt) : ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                        {isYearStart ? fmt(row.expenditureTotal) : ""}
-                                    </td>
-                                    <td
-                                        className={`px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium ${
-                                            isYearStart && row.netIncomeExpenditure < 0
-                                                ? "text-red-600"
-                                                : isYearStart && row.netIncomeExpenditure > 0
-                                                  ? "text-green-700"
-                                                  : ""
-                                        }`}
-                                    >
-                                        {isYearStart ? fmt(row.netIncomeExpenditure) : ""}
-                                    </td>
-                                    {table.visibleAssetTypes.map(t => (
-                                        <td
-                                            key={`wd-${row.year}-${row.poolIndex}-${t}`}
-                                            className="px-2 py-1 text-right tabular-nums whitespace-nowrap"
-                                        >
-                                            {fmt(row.withdrawals[t] || 0)}
-                                        </td>
-                                    ))}
-                                    {table.visibleAssetTypes.length > 0 && (
-                                        <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap font-medium">
-                                            {fmt(row.withdrawalsTotal)}
-                                        </td>
-                                    )}
-                                </tr>
+                                            {GROUP_LABELS[group]}
+                                        </th>
+                                        {breakdown.years.map((y, i) => (
+                                            <th
+                                                key={`grp-${group}-${i}-${y.year}`}
+                                                className={`${GROUP_HEADER_BG[group]} px-2 py-1`}
+                                            />
+                                        ))}
+                                    </tr>
+                                    {rows.map((row, i) => renderRow(row, `${group}-${i}`))}
+                                </Fragment>
                             )
                         })}
                     </tbody>

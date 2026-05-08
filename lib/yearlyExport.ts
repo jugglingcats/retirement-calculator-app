@@ -1,5 +1,5 @@
-import { AssetPool, AssetPoolType, AssetType, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
-import { ASSET_LABELS, ASSET_TYPES_IN_ORDER, householdYearly, sumPool } from "@/lib/yearlyView"
+import { AssetPoolType, AssetType, ProjectionResult, RetirementData, YearlyDatapoint } from "@/lib/types"
+import { ASSET_LABELS, ASSET_TYPES_IN_ORDER } from "@/lib/yearlyView"
 
 // Re-export the shared display helpers so callers that already import from this
 // file keep working. New code should import them directly from `lib/yearlyView`.
@@ -7,102 +7,236 @@ export { ASSET_LABELS, ASSET_TYPES_IN_ORDER }
 /** @deprecated Import `ASSET_TYPES_IN_ORDER` from `@/lib/yearlyView` instead. */
 export const ASSET_DISPLAY_ORDER = ASSET_TYPES_IN_ORDER
 
-export interface YearlyExportRow {
+export type BreakdownGroup = "assets" | "income" | "withdrawals" | "expenses"
+
+export interface BreakdownYearColumn {
     year: number
+    /** Primary person's age in this year. */
     age: number
-    /** 0 = primary ("me"), 1 = spouse — matches `AssetPoolType` and `YearlyDatapoint.pools`. */
-    poolIndex: AssetPoolType
-    personLabel: string
-    initial: AssetPool
-    initialTotal: number
-    statePension: number
-    otherIncome: number
-    incomeTotal: number
-    expenditure: number // household value, only filled on primary row
-    tax: number // household income tax, only filled on primary row
-    cgt: number // household CGT, only filled on primary row
-    expenditureTotal: number // expenditure + tax + cgt, only filled on primary row
-    netIncomeExpenditure: number // incomeTotal - expenditureTotal (primary row uses household totals)
-    withdrawals: AssetPool
-    withdrawalsTotal: number
+    /** Partner's age in this year, if a partner is configured. */
+    spouseAge?: number
 }
 
-export interface YearlyExportTable {
-    rows: YearlyExportRow[]
-    /** Asset types that are non-zero somewhere in either an initial position or a withdrawal column. */
-    visibleAssetTypes: AssetType[]
-    /** Whether the spouse pool has any data worth showing. */
+export interface BreakdownRow {
+    group: BreakdownGroup
+    /** Row label, e.g. "State Pension", "Cash", "Income Tax". */
+    label: string
+    /** Person the row belongs to, when applicable. Omitted for household-level rows and totals. */
+    person?: "me" | "partner"
+    /** Marks a per-group subtotal row. */
+    isGroupTotal?: boolean
+    /** One value per column in {@link YearlyBreakdown.years}. */
+    values: number[]
+}
+
+export interface YearlyBreakdown {
+    years: BreakdownYearColumn[]
+    rows: BreakdownRow[]
+    /** Whether the partner pool is shown. */
     hasSpouse: boolean
+    /** Asset types non-zero in any initial position — drives the per-asset Assets rows. */
+    visibleInitialAssetTypes: AssetType[]
+    /** Asset types that are non-zero in withdrawals somewhere — drives the per-asset Withdrawals rows. */
+    visibleAssetTypes: AssetType[]
 }
 
-const POOL_INDICES: AssetPoolType[] = [AssetPoolType.PRIMARY, AssetPoolType.SPOUSE]
+const PERSON_LABEL: Record<NonNullable<BreakdownRow["person"]>, string> = {
+    me: "Me",
+    partner: "Partner"
+}
 
-function buildRow(yd: YearlyDatapoint, poolIndex: AssetPoolType): YearlyExportRow {
-    const p = yd.pools[poolIndex]
-    const isPrimary = poolIndex === AssetPoolType.PRIMARY
+export function personLabel(p: NonNullable<BreakdownRow["person"]>): string {
+    return PERSON_LABEL[p]
+}
 
-    const initial = p.initialPosition
-    const initialTotal = sumPool(initial)
-    const withdrawals = p.withdrawals
-    const withdrawalsTotal = sumPool(withdrawals)
-    const incomeTotal = (p.income.statePension || 0) + (p.income.otherIncome || 0)
+export const GROUP_LABELS: Record<BreakdownGroup, string> = {
+    assets: "Starting Assets",
+    income: "Income",
+    withdrawals: "Withdrawals",
+    expenses: "Expenses"
+}
 
-    const hh = householdYearly(yd)
-    const expenditure = isPrimary ? hh.expenditure : 0
-    const tax = isPrimary ? hh.taxPayable : 0
-    const cgt = isPrimary ? hh.cgtPayable : 0
-    const expenditureTotal = expenditure + tax + cgt
-    const netIncomeExpenditure = isPrimary ? hh.income - expenditureTotal : 0
+function poolFor(yd: YearlyDatapoint, pool: AssetPoolType) {
+    return yd.pools[pool]
+}
 
-    return {
-        year: yd.year,
-        age: yd.age,
-        poolIndex,
-        personLabel: isPrimary ? "Me" : "Partner",
-        initial,
-        initialTotal,
-        statePension: p.income.statePension || 0,
-        otherIncome: p.income.otherIncome || 0,
-        incomeTotal,
-        expenditure,
-        tax,
-        cgt,
-        expenditureTotal,
-        netIncomeExpenditure,
-        withdrawals,
-        withdrawalsTotal
-    }
+function hasAnySpouseActivity(years: YearlyDatapoint[]): boolean {
+    return years.some(yd => {
+        const s = yd.pools[AssetPoolType.SPOUSE]
+        if (s.income.statePension || s.income.otherIncome) return true
+        if (s.tax || s.cgtPayable) return true
+        for (const t of ASSET_TYPES_IN_ORDER) {
+            if ((s.initialPosition[t] || 0) !== 0) return true
+            if ((s.withdrawals[t] || 0) !== 0) return true
+        }
+        return false
+    })
 }
 
 /**
- * Build the per-year, per-person table used by both the on-screen table and the Excel export.
- * Each year produces two rows: one for the primary person and one for the partner/spouse.
+ * Build a transposed yearly breakdown: one column per year, rows grouped into
+ * Income / Withdrawals / Expenses, with a totals row per group. Each asset class
+ * contributes two rows (Me / Partner) within the Withdrawals group when a partner
+ * is configured; income and tax/CGT are likewise split per person. Spending is
+ * a single household row.
  */
-export function buildYearlyExportTable(data: RetirementData, projection: ProjectionResult): YearlyExportTable {
-    const hasSpouse = !!data.personal.spouseDateOfBirth
+export function buildYearlyBreakdown(data: RetirementData, projection: ProjectionResult): YearlyBreakdown {
+    const yds = projection.yearlyData
 
-    const rows: YearlyExportRow[] = []
-    for (const yd of projection.yearlyData) {
-        for (const poolIndex of POOL_INDICES) {
-            const row = buildRow(yd, poolIndex)
-            // Skip spouse rows entirely if the user has no partner configured and there's nothing to show.
-            if (
-                poolIndex === AssetPoolType.SPOUSE &&
-                !hasSpouse &&
-                row.initialTotal === 0 &&
-                row.withdrawalsTotal === 0 &&
-                row.incomeTotal === 0
-            ) {
-                continue
-            }
-            rows.push(row)
-        }
-    }
+    const includePartner = data.personal.includePartner ?? Boolean(data.personal.spouseDateOfBirth)
+    const hasSpouse = includePartner && hasAnySpouseActivity(yds)
 
-    // Determine which asset types ever carry a non-zero value in initial position or withdrawals.
+    const spouseBirthYear = data.personal.spouseDateOfBirth
+        ? new Date(data.personal.spouseDateOfBirth).getFullYear()
+        : null
+    const years: BreakdownYearColumn[] = yds.map(yd => ({
+        year: yd.year,
+        age: yd.age,
+        spouseAge: hasSpouse && spouseBirthYear !== null ? yd.year - spouseBirthYear : undefined
+    }))
+
+    // Determine which asset types appear in initial positions vs withdrawals.
+    const visibleInitialAssetTypes = ASSET_TYPES_IN_ORDER.filter(type =>
+        yds.some(
+            yd =>
+                (yd.pools[AssetPoolType.PRIMARY].initialPosition[type] || 0) !== 0 ||
+                (yd.pools[AssetPoolType.SPOUSE].initialPosition[type] || 0) !== 0
+        )
+    )
     const visibleAssetTypes = ASSET_TYPES_IN_ORDER.filter(type =>
-        rows.some(r => (r.initial[type] || 0) !== 0 || (r.withdrawals[type] || 0) !== 0)
+        yds.some(
+            yd =>
+                (yd.pools[AssetPoolType.PRIMARY].withdrawals[type] || 0) !== 0 ||
+                (yd.pools[AssetPoolType.SPOUSE].withdrawals[type] || 0) !== 0
+        )
     )
 
-    return { rows, visibleAssetTypes, hasSpouse }
+    const rows: BreakdownRow[] = []
+    const persons: Array<{ key: "me" | "partner"; pool: AssetPoolType }> = hasSpouse
+        ? [
+              { key: "me", pool: AssetPoolType.PRIMARY },
+              { key: "partner", pool: AssetPoolType.SPOUSE }
+          ]
+        : [{ key: "me", pool: AssetPoolType.PRIMARY }]
+
+    // ---- Assets (initial position at start of year) ----
+    for (const type of visibleInitialAssetTypes) {
+        for (const { key, pool } of persons) {
+            rows.push({
+                group: "assets",
+                label: ASSET_LABELS[type],
+                person: key,
+                values: yds.map(yd => poolFor(yd, pool).initialPosition[type] || 0)
+            })
+        }
+    }
+    rows.push({
+        group: "assets",
+        label: "Assets Total",
+        isGroupTotal: true,
+        values: yds.map(yd => {
+            let total = 0
+            for (const type of visibleInitialAssetTypes) {
+                for (const { pool } of persons) {
+                    total += poolFor(yd, pool).initialPosition[type] || 0
+                }
+            }
+            return total
+        })
+    })
+
+    // ---- Income ----
+    for (const { key, pool } of persons) {
+        rows.push({
+            group: "income",
+            label: "State Pension",
+            person: key,
+            values: yds.map(yd => poolFor(yd, pool).income.statePension || 0)
+        })
+    }
+    for (const { key, pool } of persons) {
+        rows.push({
+            group: "income",
+            label: "Other Income",
+            person: key,
+            values: yds.map(yd => poolFor(yd, pool).income.otherIncome || 0)
+        })
+    }
+    rows.push({
+        group: "income",
+        label: "Income Total",
+        isGroupTotal: true,
+        values: yds.map(yd => {
+            let total = 0
+            for (const { pool } of persons) {
+                const p = poolFor(yd, pool)
+                total += (p.income.statePension || 0) + (p.income.otherIncome || 0)
+            }
+            return total
+        })
+    })
+
+    // ---- Withdrawals ----
+    for (const type of visibleAssetTypes) {
+        for (const { key, pool } of persons) {
+            rows.push({
+                group: "withdrawals",
+                label: ASSET_LABELS[type],
+                person: key,
+                values: yds.map(yd => poolFor(yd, pool).withdrawals[type] || 0)
+            })
+        }
+    }
+    rows.push({
+        group: "withdrawals",
+        label: "Withdrawals Total",
+        isGroupTotal: true,
+        values: yds.map(yd => {
+            let total = 0
+            for (const type of visibleAssetTypes) {
+                for (const { pool } of persons) {
+                    total += poolFor(yd, pool).withdrawals[type] || 0
+                }
+            }
+            return total
+        })
+    })
+
+    // ---- Expenses ----
+    rows.push({
+        group: "expenses",
+        label: "Spending",
+        values: yds.map(yd => yd.expenditure || 0)
+    })
+    for (const { key, pool } of persons) {
+        rows.push({
+            group: "expenses",
+            label: "Income Tax",
+            person: key,
+            values: yds.map(yd => poolFor(yd, pool).tax || 0)
+        })
+    }
+    for (const { key, pool } of persons) {
+        rows.push({
+            group: "expenses",
+            label: "CGT",
+            person: key,
+            values: yds.map(yd => poolFor(yd, pool).cgtPayable || 0)
+        })
+    }
+    rows.push({
+        group: "expenses",
+        label: "Expenses Total",
+        isGroupTotal: true,
+        values: yds.map(yd => {
+            let total = yd.expenditure || 0
+            for (const { pool } of persons) {
+                const p = poolFor(yd, pool)
+                total += (p.tax || 0) + (p.cgtPayable || 0)
+            }
+            return total
+        })
+    })
+
+    return { years, rows, hasSpouse, visibleInitialAssetTypes, visibleAssetTypes }
 }

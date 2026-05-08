@@ -1,223 +1,146 @@
 import ExcelJS from "exceljs"
-import { buildYearlyExportTable, YearlyExportRow, YearlyExportTable } from "@/lib/yearlyExport"
-import { ASSET_LABELS } from "@/lib/yearlyView"
-import { AssetPoolType, AssetType, ProjectionResult, RetirementData } from "@/lib/types"
+import {
+    BreakdownGroup,
+    BreakdownRow,
+    GROUP_LABELS,
+    YearlyBreakdown,
+    buildYearlyBreakdown,
+    personLabel
+} from "@/lib/yearlyExport"
+import { ProjectionResult, RetirementData } from "@/lib/types"
 
 const GBP_FORMAT = "[$£-809]#,##0;[Red]-[$£-809]#,##0"
 
-interface ColumnSpec {
-    header: string
-    group: "meta" | "initial" | "income" | "expenditure" | "net" | "withdrawals"
-    width: number
-    /** When defined, the column is rendered as currency. */
-    currency?: boolean
-    /** Extracts the value for the column from a row. */
-    value: (row: YearlyExportRow) => number | string
-}
+const GROUP_ORDER: BreakdownGroup[] = ["assets", "income", "withdrawals", "expenses"]
 
-function buildColumns(table: YearlyExportTable): ColumnSpec[] {
-    const cols: ColumnSpec[] = [
-        { header: "Year", group: "meta", width: 8, value: r => r.year },
-        { header: "Age", group: "meta", width: 6, value: r => r.age },
-        { header: "Person", group: "meta", width: 10, value: r => r.personLabel }
-    ]
-
-    for (const type of table.visibleAssetTypes) {
-        cols.push({
-            header: `Initial: ${ASSET_LABELS[type as AssetType]}`,
-            group: "initial",
-            width: 18,
-            currency: true,
-            value: r => r.initial[type] || 0
-        })
-    }
-    cols.push({
-        header: "Initial: Total",
-        group: "initial",
-        width: 18,
-        currency: true,
-        value: r => r.initialTotal
-    })
-
-    cols.push({
-        header: "Income: State Pension",
-        group: "income",
-        width: 20,
-        currency: true,
-        value: r => r.statePension
-    })
-    cols.push({
-        header: "Income: Other Income",
-        group: "income",
-        width: 22,
-        currency: true,
-        value: r => r.otherIncome
-    })
-    cols.push({
-        header: "Income: Total",
-        group: "income",
-        width: 16,
-        currency: true,
-        value: r => r.incomeTotal
-    })
-
-    cols.push({
-        header: "Expenditure (household)",
-        group: "expenditure",
-        width: 22,
-        currency: true,
-        value: r => r.expenditure
-    })
-    cols.push({
-        header: "Income Tax",
-        group: "expenditure",
-        width: 14,
-        currency: true,
-        value: r => r.tax
-    })
-    cols.push({
-        header: "CGT",
-        group: "expenditure",
-        width: 12,
-        currency: true,
-        value: r => r.cgt
-    })
-    cols.push({
-        header: "Expenditure: Total",
-        group: "expenditure",
-        width: 18,
-        currency: true,
-        value: r => r.expenditureTotal
-    })
-
-    cols.push({
-        header: "Net Income − Expenditure",
-        group: "net",
-        width: 22,
-        currency: true,
-        value: r => r.netIncomeExpenditure
-    })
-
-    for (const type of table.visibleAssetTypes) {
-        cols.push({
-            header: `Withdraw: ${ASSET_LABELS[type as AssetType]}`,
-            group: "withdrawals",
-            width: 18,
-            currency: true,
-            value: r => r.withdrawals[type] || 0
-        })
-    }
-    cols.push({
-        header: "Withdraw: Total",
-        group: "withdrawals",
-        width: 18,
-        currency: true,
-        value: r => r.withdrawalsTotal
-    })
-
-    return cols
-}
-
-const GROUP_COLORS: Record<ColumnSpec["group"], string> = {
-    meta: "FFE5E7EB", // gray-200
-    initial: "FFDBEAFE", // blue-100
+// ARGB fills for the row label/value cells.
+const GROUP_FILL: Record<BreakdownGroup, string> = {
+    assets: "FFDBEAFE", // blue-100
     income: "FFDCFCE7", // green-100
-    expenditure: "FFFEF3C7", // amber-100
-    net: "FFEDE9FE", // violet-100
-    withdrawals: "FFFFE4E6" // rose-100
+    withdrawals: "FFFFE4E6", // rose-100
+    expenses: "FFFEF3C7" // amber-100
+}
+const GROUP_TOTAL_FILL: Record<BreakdownGroup, string> = {
+    assets: "FFBFDBFE", // blue-200
+    income: "FFBBF7D0", // green-200
+    withdrawals: "FFFECDD3", // rose-200
+    expenses: "FFFDE68A" // amber-200
+}
+const GROUP_HEADER_FILL: Record<BreakdownGroup, string> = {
+    assets: "FF93C5FD", // blue-300
+    income: "FF86EFAC", // green-300
+    withdrawals: "FFFDA4AF", // rose-300
+    expenses: "FFFCD34D" // amber-300
 }
 
-const GROUP_HEADER_LABELS: Record<ColumnSpec["group"], string> = {
-    meta: "",
-    initial: "Initial position (start of year)",
-    income: "Income",
-    expenditure: "Expenditure",
-    net: "Net",
-    withdrawals: "Withdrawals"
-}
-
-function applyHeaderStyle(cell: ExcelJS.Cell, color: string) {
-    cell.font = { bold: true }
-    cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } }
-    cell.border = {
-        top: { style: "thin", color: { argb: "FF9CA3AF" } },
-        bottom: { style: "thin", color: { argb: "FF9CA3AF" } },
-        left: { style: "thin", color: { argb: "FFD1D5DB" } },
-        right: { style: "thin", color: { argb: "FFD1D5DB" } }
+function setCurrencyCell(cell: ExcelJS.Cell, value: number, fill?: string, bold = false) {
+    cell.value = value
+    cell.numFmt = GBP_FORMAT
+    cell.alignment = { horizontal: "right" }
+    if (bold) cell.font = { bold: true }
+    if (fill) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } }
     }
+}
+
+function setLabelCell(cell: ExcelJS.Cell, text: string, fill: string, bold = false) {
+    cell.value = text
+    cell.alignment = { horizontal: "left", vertical: "middle" }
+    if (bold) cell.font = { bold: true }
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } }
 }
 
 export async function buildYearlyWorkbook(data: RetirementData, projection: ProjectionResult): Promise<Blob> {
-    const table = buildYearlyExportTable(data, projection)
-    const columns = buildColumns(table)
+    const breakdown: YearlyBreakdown = buildYearlyBreakdown(data, projection)
+    const yearCount = breakdown.years.length
 
     const workbook = new ExcelJS.Workbook()
     workbook.creator = "Retirement Calculator"
     workbook.created = new Date()
 
     const sheet = workbook.addWorksheet("Yearly Projection", {
-        views: [{ state: "frozen", xSplit: 3, ySplit: 2 }]
+        views: [{ state: "frozen", xSplit: 2, ySplit: 2 }]
     })
 
-    // Set column widths
-    sheet.columns = columns.map((c, i) => ({ key: `c${i}`, width: c.width }))
+    // Column widths: Item, Person, then one per year.
+    sheet.columns = [
+        { key: "label", width: 26 },
+        { key: "person", width: 10 },
+        ...breakdown.years.map((_, i) => ({ key: `y${i}`, width: 14 }))
+    ]
 
-    // Group header row (row 1): merges contiguous columns within the same group.
-    const groupRow = sheet.addRow(columns.map(c => GROUP_HEADER_LABELS[c.group]))
-    groupRow.height = 22
-    let i = 0
-    while (i < columns.length) {
-        let j = i
-        while (j + 1 < columns.length && columns[j + 1].group === columns[i].group) j++
-        if (j > i) {
-            sheet.mergeCells(1, i + 1, 1, j + 1)
-        }
-        applyHeaderStyle(groupRow.getCell(i + 1), GROUP_COLORS[columns[i].group])
-        i = j + 1
-    }
-
-    // Column header row (row 2)
-    const headerRow = sheet.addRow(columns.map(c => c.header))
-    headerRow.height = 36
-    columns.forEach((c, idx) => applyHeaderStyle(headerRow.getCell(idx + 1), GROUP_COLORS[c.group]))
-
-    // Data rows
-    table.rows.forEach((row, rIdx) => {
-        const values = columns.map(c => c.value(row))
-        const xlRow = sheet.addRow(values)
-        const isYearStart = row.poolIndex === AssetPoolType.PRIMARY
-        columns.forEach((c, idx) => {
-            const cell = xlRow.getCell(idx + 1)
-            if (c.currency) {
-                cell.numFmt = GBP_FORMAT
-                cell.alignment = { horizontal: "right" }
-            } else if (c.header === "Year" || c.header === "Age") {
-                cell.alignment = { horizontal: "center" }
-            }
-            // Subtle banding by year (every two rows).
-            const banded = Math.floor(rIdx / 2) % 2 === 1
-            if (banded) {
-                cell.fill = {
-                    type: "pattern",
-                    pattern: "solid",
-                    fgColor: { argb: "FFF9FAFB" }
-                }
-            }
-            // Top border between years.
-            if (isYearStart && rIdx > 0) {
-                cell.border = {
-                    ...(cell.border || {}),
-                    top: { style: "thin", color: { argb: "FFD1D5DB" } }
-                }
-            }
+    // ---- Header rows (2 rows: year, age) ----
+    const yearRow = sheet.addRow(["Item", "Person", ...breakdown.years.map(y => y.year)])
+    yearRow.height = 20
+    const ageRow = sheet.addRow([
+        "",
+        "",
+        ...breakdown.years.map(y => {
+            const ages = breakdown.hasSpouse && y.spouseAge !== undefined ? `${y.age} / ${y.spouseAge}` : `${y.age}`
+            return `Age ${ages}`
         })
-    })
+    ])
+    ageRow.height = 16
 
-    // Auto filter on the column header row.
-    sheet.autoFilter = {
-        from: { row: 2, column: 1 },
-        to: { row: 2, column: columns.length }
+    const headerFill = "FFE5E7EB" // gray-200
+    for (let c = 1; c <= 2 + yearCount; c++) {
+        const yc = yearRow.getCell(c)
+        yc.font = { bold: true }
+        yc.alignment = { horizontal: c <= 2 ? "left" : "right", vertical: "middle" }
+        yc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerFill } }
+        yc.border = { bottom: { style: "thin", color: { argb: "FF9CA3AF" } } }
+
+        const ac = ageRow.getCell(c)
+        ac.font = { italic: true, color: { argb: "FF6B7280" } }
+        ac.alignment = { horizontal: c <= 2 ? "left" : "right", vertical: "middle" }
+        ac.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } }
+        ac.border = { bottom: { style: "thin", color: { argb: "FF9CA3AF" } } }
+    }
+    sheet.mergeCells(1, 1, 2, 1)
+    sheet.mergeCells(1, 2, 2, 2)
+
+    // ---- Group rows ----
+    const rowsByGroup: Record<BreakdownGroup, BreakdownRow[]> = {
+        assets: [],
+        income: [],
+        withdrawals: [],
+        expenses: []
+    }
+    for (const r of breakdown.rows) rowsByGroup[r.group].push(r)
+
+    for (const group of GROUP_ORDER) {
+        const rows = rowsByGroup[group]
+        if (rows.length === 0) continue
+
+        // Group header row spanning all columns.
+        const headerRow = sheet.addRow([GROUP_LABELS[group]])
+        headerRow.height = 20
+        sheet.mergeCells(headerRow.number, 1, headerRow.number, 2 + yearCount)
+        const hCell = headerRow.getCell(1)
+        hCell.value = GROUP_LABELS[group]
+        hCell.font = { bold: true }
+        hCell.alignment = { horizontal: "left", vertical: "middle" }
+        hCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GROUP_HEADER_FILL[group] } }
+
+        for (const row of rows) {
+            const isTotal = !!row.isGroupTotal
+            const fill = isTotal ? GROUP_TOTAL_FILL[group] : GROUP_FILL[group]
+            const xlRow = sheet.addRow([])
+            setLabelCell(xlRow.getCell(1), row.label, fill, isTotal)
+            setLabelCell(xlRow.getCell(2), row.person ? personLabel(row.person) : "", fill, isTotal)
+            for (let i = 0; i < yearCount; i++) {
+                setCurrencyCell(xlRow.getCell(3 + i), row.values[i] || 0, fill, isTotal)
+            }
+            if (isTotal) {
+                for (let c = 1; c <= 2 + yearCount; c++) {
+                    const cell = xlRow.getCell(c)
+                    cell.border = {
+                        ...(cell.border || {}),
+                        top: { style: "thin", color: { argb: "FF9CA3AF" } }
+                    }
+                }
+            }
+        }
     }
 
     const buffer = await workbook.xlsx.writeBuffer()
