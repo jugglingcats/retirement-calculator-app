@@ -148,6 +148,16 @@ export function buildYearlyBreakdown(data: RetirementData, projection: Projectio
         })
     })
 
+    // ---- Debt (start-of-year balance, shown as a negative line under STARTING ASSETS) ----
+    const hasAnyDebt = yds.some(yd => (yd.debt?.startBalance || 0) > 0 || (yd.debt?.repayments || 0) > 0)
+    if (hasAnyDebt) {
+        rows.push({
+            group: "assets",
+            label: "Debt",
+            values: yds.map(yd => -(yd.debt?.startBalance || 0))
+        })
+    }
+
     // ---- Income ----
     for (const { key, pool } of persons) {
         rows.push({
@@ -211,6 +221,13 @@ export function buildYearlyBreakdown(data: RetirementData, projection: Projectio
         label: "Spending",
         values: yds.map(yd => yd.expenditure || 0)
     })
+    if (hasAnyDebt) {
+        rows.push({
+            group: "expenses",
+            label: "Debt Repayments",
+            values: yds.map(yd => yd.debt?.repayments || 0)
+        })
+    }
     for (const { key, pool } of persons) {
         rows.push({
             group: "expenses",
@@ -233,6 +250,7 @@ export function buildYearlyBreakdown(data: RetirementData, projection: Projectio
         isGroupTotal: true,
         values: yds.map(yd => {
             let total = yd.expenditure || 0
+            total += yd.debt?.repayments || 0
             for (const { pool } of persons) {
                 const p = poolFor(yd, pool)
                 total += (p.tax || 0) + (p.cgtPayable || 0)

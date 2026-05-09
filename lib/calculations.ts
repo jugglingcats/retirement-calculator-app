@@ -27,6 +27,7 @@ import { applyBedAndISAToPensions, applyBedAndISAToStocks } from "@/lib/annual/b
 import { applyOneOffs } from "@/lib/annual/oneOffs"
 import { applyMarketShocks } from "@/lib/annual/marketShock"
 import { applyGrowth } from "@/lib/annual/growth"
+import { advanceDebt } from "@/lib/debt"
 
 export function calculateProjection(
     data: RetirementData,
@@ -36,6 +37,9 @@ export function calculateProjection(
     console.clear()
 
     const { personal, assets, shocks, assumptions, incomeTax, incomeNeeds, incomeStreams, oneOffs } = data
+    const debts = data.debts ?? []
+    // Per-debt running balance across the whole projection. Disabled debts contribute 0.
+    const debtBalances: number[] = debts.map(d => (d.enabled === false ? 0 : d.balance || 0))
 
     const currentYear = new Date().getFullYear()
     const birthYear = new Date(personal.dateOfBirth).getFullYear()
@@ -126,6 +130,28 @@ export function calculateProjection(
             expenditure = applicableNeed.annualAmount * inflationMultiplier
         }
 
+        // Advance debts by 12 months. Repayments are funded as part of the household's
+        // expenditure so the drawdown strategy will tap assets when income is short.
+        // Interest accrues monthly on each outstanding balance.
+        const debtStartBalance = debtBalances.reduce((s, b) => s + Math.max(0, b), 0)
+        let debtInterestThisYear = 0
+        let debtRepaymentsThisYear = 0
+        for (let di = 0; di < debts.length; di++) {
+            const d = debts[di]
+            if (d.enabled === false) continue
+            if ((debtBalances[di] || 0) <= 0) continue
+            const result = advanceDebt(debtBalances[di], d.aprPercent || 0, d.monthlyRepayment || 0, 12)
+            debtBalances[di] = result.balance
+            debtInterestThisYear += result.interest
+            debtRepaymentsThisYear += result.paid
+        }
+        const debtEndBalance = debtBalances.reduce((s, b) => s + Math.max(0, b), 0)
+
+        // Treat debt repayments as an additional household expense for funding
+        // (drawdown / shortfall). The underlying spending `expenditure` is kept
+        // separate so the breakdown reports both lines distinctly.
+        const totalSpend = expenditure + debtRepaymentsThisYear
+
         const baseTaxableIncome = sumNumbers(taxableIncome)
 
         const taxPosition = taxableIncome.map(_ => initialTaxPosition(incomeTax, taxBandMultiplier))
@@ -143,9 +169,9 @@ export function calculateProjection(
         // drawdown strategy runs (i.e. when there is a shortfall).
         const audit: AuditEntry[] = []
 
-        if (expenditure > 0) {
+        if (totalSpend > 0) {
             // Initial tax liability is handled in `execute` method, so just include the initial cash liability here
-            const shortfall = expenditure - baseTaxableIncome + initialCashLiability
+            const shortfall = totalSpend - baseTaxableIncome + initialCashLiability
 
             if (shortfall > 0) {
                 const growthRates = Object.fromEntries(
@@ -226,7 +252,7 @@ export function calculateProjection(
         // the full tax position here to get the true net surplus.
         const totalTaxThisYear = taxPosition[0].tax + taxPosition[1].tax
         const totalCGTThisYear = cgtResults[0].cgtPayable + cgtResults[1].cgtPayable
-        const netSurplus = Math.max(0, baseTaxableIncome - expenditure - totalTaxThisYear - totalCGTThisYear)
+        const netSurplus = Math.max(0, baseTaxableIncome - totalSpend - totalTaxThisYear - totalCGTThisYear)
         if (netSurplus > 0 && baseTaxableIncome > 0) {
             surplusToDeposit = [
                 (netSurplus * taxableIncome[0]) / baseTaxableIncome,
@@ -265,7 +291,7 @@ export function calculateProjection(
         const totalCGTPayable = cgtResults[0].cgtPayable + cgtResults[1].cgtPayable
         const totalWithdrawalsSum = sumPool(withdrawalsDetailPerPool[0]) + sumPool(withdrawalsDetailPerPool[1])
         const netResourcesForSpending = baseTaxableIncome + totalWithdrawalsSum - totalTaxPayable - totalCGTPayable
-        const computedShortfall = expenditure > 0 ? Math.max(0, expenditure - netResourcesForSpending) : 0
+        const computedShortfall = totalSpend > 0 ? Math.max(0, totalSpend - netResourcesForSpending) : 0
 
         yearlyData.push({
             year,
@@ -273,7 +299,16 @@ export function calculateProjection(
             pools,
             expenditure,
             shortfall: computedShortfall,
-            audit
+            audit,
+            debt:
+                debtStartBalance > 0 || debtRepaymentsThisYear > 0
+                    ? {
+                          startBalance: debtStartBalance,
+                          interest: debtInterestThisYear,
+                          repayments: debtRepaymentsThisYear,
+                          endBalance: debtEndBalance
+                      }
+                    : undefined
         })
 
         if (currentTotalAssets <= 0 && !runsOutAt && expenditure > 0) {

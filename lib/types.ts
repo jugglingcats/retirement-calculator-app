@@ -113,6 +113,18 @@ export interface OneOff {
     belongsToSpouse?: boolean
 }
 
+export interface Debt {
+    id: string
+    name: string
+    /** Current outstanding balance in today's money. */
+    balance: number
+    /** Annual percentage rate (interest), e.g. 5 for 5%. */
+    aprPercent: number
+    /** Fixed monthly repayment amount. */
+    monthlyRepayment: number
+    enabled?: boolean
+}
+
 export interface RetirementData {
     personal: PersonalInfo
     assets: Asset[]
@@ -122,6 +134,7 @@ export interface RetirementData {
     incomeTax: TaxSettings // Added income tax settings
     shocks: MarketShock[]
     oneOffs: OneOff[]
+    debts?: Debt[]
 }
 
 // Strategy for funding shortfalls during retirement projections
@@ -202,6 +215,17 @@ export type YearlyDatapoint = {
     expenditure: number
     // Unmet expenditure for the year, when assets and income are insufficient.
     shortfall: number
+    /**
+     * Aggregated debt activity for the year. `startBalance` is total debt at start
+     * of year (before interest/repayments), `endBalance` is the total at year end
+     * after 12 monthly cycles of interest accrual and repayments.
+     */
+    debt?: {
+        startBalance: number
+        interest: number
+        repayments: number
+        endBalance: number
+    }
     /**
      * Per-year audit log of drawdown strategy decisions. Populated only in years
      * where the drawdown strategy is invoked (i.e. when there is a shortfall).

@@ -12,6 +12,7 @@ export const defaultRetirementData: RetirementData = {
         retirementAge: 65
     },
     assets: [],
+    debts: [],
     incomeNeeds: [],
     incomeStreams: [],
     assumptions: {
@@ -53,6 +54,7 @@ export function useRetirementData(): [RetirementData, (data: RetirementData) => 
                 }
                 if (!parsedData.incomeStreams) parsedData.incomeStreams = []
                 if (!parsedData.oneOffs) parsedData.oneOffs = []
+                if (!parsedData.debts) parsedData.debts = []
                 if (!parsedData.incomeTax) {
                     parsedData.incomeTax = {
                         personalAllowance: 12570,

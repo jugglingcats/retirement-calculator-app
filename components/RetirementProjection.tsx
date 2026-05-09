@@ -20,6 +20,7 @@ import { HouseholdYearly, householdYearlySeries } from "@/lib/yearlyView"
 import YearlyBreakdownSection from "@/components/YearlyBreakdownSection"
 import { formatGBP } from "@/components/util"
 import { deflateProjection } from "@/lib/deflate"
+import { totalDebtBalance } from "@/lib/debt"
 
 const STRATEGY_STORAGE_KEY = "retirement-calculator-drawdown-strategy"
 const VALID_STRATEGIES: DrawdownStrategy[] = ["balanced", "lowest_growth_first", "tax_optimized"]
@@ -108,10 +109,22 @@ export default function RetirementProjection({ data, setData }: Props) {
 
     const { yearlyData, runsOutAt, currentAssets } = displayProjections[strategy]
 
+    // Total current debt (used to net the headline figures).
+    const currentDebt = totalDebtBalance(data.debts)
+    const netCurrentAssets = currentAssets - currentDebt
+
     // Household-level series derived from the per-pool simulation output. This is what
     // the charts and the asset tooltip read from â€” `yearlyData` itself only carries the
     // per-pool record now.
     const householdSeries = useMemo(() => householdYearlySeries(yearlyData), [yearlyData])
+
+    // Net projected balance at retirement = projected assets minus outstanding debt
+    // at the start of the retirement year.
+    const projectedAtRetirement = useMemo(() => {
+        const row = householdSeries.find(d => d.age === data.personal.retirementAge)
+        if (!row) return 0
+        return Math.round((row.assets || 0) - (row.debtStartBalance || 0))
+    }, [householdSeries, data.personal.retirementAge])
 
     // Compute the fixed Y-axis max as the largest total assets across all strategies and years
     const fixedYAxisMax = useMemo(() => {
@@ -247,17 +260,17 @@ export default function RetirementProjection({ data, setData }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-6 bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg text-white">
                     <div className="text-sm opacity-90 mb-2">Current Assets</div>
-                    <div className="text-3xl font-bold">£{currentAssets.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">£{netCurrentAssets.toLocaleString()}</div>
+                    {currentDebt > 0 && (
+                        <div className="text-xs opacity-80 mt-1">
+                            £{currentAssets.toLocaleString()} assets − £{currentDebt.toLocaleString()} debt
+                        </div>
+                    )}
                 </div>
 
                 <div className="p-6 bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg text-white">
                     <div className="text-sm opacity-90 mb-2">Projected at Your Retirement</div>
-                    <div className="text-3xl font-bold">
-                        £
-                        {Math.round(
-                            householdSeries.find(d => d.age === data.personal.retirementAge)?.assets || 0
-                        ).toLocaleString()}
-                    </div>
+                    <div className="text-3xl font-bold">£{projectedAtRetirement.toLocaleString()}</div>
                 </div>
 
                 {runsOutAt ? (
@@ -491,8 +504,9 @@ export default function RetirementProjection({ data, setData }: Props) {
                         <Legend />
                         <Bar dataKey="statePension" stackId="income" fill="#34d399" name="State Pension" />
                         <Bar dataKey="otherIncome" stackId="income" fill="#8b5cf6" name="Other Income" />
+                        <Bar dataKey="debtRepayments" stackId="income" fill="#f97316" name="Debt Repayments" />
                         <Bar
-                            dataKey="assetWithdrawals"
+                            dataKey="assetWithdrawalsExDebt"
                             stackId="income"
                             fill="url(#withdrawHatch)"
                             stroke="#9a3412"
@@ -525,11 +539,16 @@ export default function RetirementProjection({ data, setData }: Props) {
                         />
                         <Line
                             type="monotone"
-                            dataKey={(d: any) => (d.expenditure || 0) + (d.taxPayable || 0) + (d.cgtPayable || 0)}
+                            dataKey={(d: any) =>
+                                (d.expenditure || 0) +
+                                (d.taxPayable || 0) +
+                                (d.cgtPayable || 0) +
+                                (d.debtRepayments || 0)
+                            }
                             stroke="#6b7280"
                             strokeWidth={2}
                             strokeDasharray="5 5"
-                            name="Total (Exp + Tax + CGT)"
+                            name="Total"
                             dot={false}
                         />
                     </ComposedChart>

@@ -80,11 +80,25 @@ export interface HouseholdYearly {
     income: number
     // Combined outflows:
     assetWithdrawals: number
+    /**
+     * Asset withdrawals net of debt repayments. Useful for charts that show debt
+     * repayments as a separate stack segment so the bar doesn't double-count
+     * (the underlying drawdown already funds debt repayments). Clamped at 0.
+     */
+    assetWithdrawalsExDebt: number
     taxPayable: number
     cgtPayable: number
     // Carried through from `YearlyDatapoint`:
     expenditure: number
     shortfall: number
+    /** Total outstanding debt at start of year (sum across all debts). */
+    debtStartBalance: number
+    /** Total outstanding debt at end of year. */
+    debtEndBalance: number
+    /** Debt repayments paid this year (capital + interest). */
+    debtRepayments: number
+    /** Interest accrued on debts this year. */
+    debtInterest: number
 }
 
 /**
@@ -114,6 +128,8 @@ export function householdYearly(yd: YearlyDatapoint): HouseholdYearly {
     const assetWithdrawals = sumPool(primary.withdrawals) + sumPool(spouse.withdrawals)
     const taxPayable = primary.tax + spouse.tax
     const cgtPayable = primary.cgtPayable + spouse.cgtPayable
+    const debtRepayments = yd.debt?.repayments || 0
+    const assetWithdrawalsExDebt = Math.max(0, assetWithdrawals - debtRepayments)
 
     return {
         year: yd.year,
@@ -130,10 +146,15 @@ export function householdYearly(yd: YearlyDatapoint): HouseholdYearly {
         otherIncome,
         income,
         assetWithdrawals,
+        assetWithdrawalsExDebt,
         taxPayable,
         cgtPayable,
         expenditure: yd.expenditure,
-        shortfall: yd.shortfall
+        shortfall: yd.shortfall,
+        debtStartBalance: yd.debt?.startBalance || 0,
+        debtEndBalance: yd.debt?.endBalance || 0,
+        debtRepayments: yd.debt?.repayments || 0,
+        debtInterest: yd.debt?.interest || 0
     }
 }
 

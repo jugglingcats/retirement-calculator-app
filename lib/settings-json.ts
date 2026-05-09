@@ -42,7 +42,8 @@ export const parseSettings = (text: string): RetirementData => {
             higherRateThreshold: 50270
         },
         shocks: parsed.shocks ?? [],
-        oneOffs: parsed.oneOffs ?? []
+        oneOffs: parsed.oneOffs ?? [],
+        debts: parsed.debts ?? []
     }
 }
 

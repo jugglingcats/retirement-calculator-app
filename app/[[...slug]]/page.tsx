@@ -10,6 +10,7 @@ import IncomeForm from "@/components/IncomeForm"
 import AssumptionsForm from "@/components/AssumptionsForm"
 import ShocksForm from "@/components/ShocksForm"
 import OneOffsForm from "@/components/OneOffsForm"
+import DebtsForm from "@/components/DebtsForm"
 import RetirementProjection from "@/components/RetirementProjection"
 
 import { exportSettings, readSettingsFile } from "@/lib/settings-json"
@@ -25,6 +26,7 @@ const tabs: TabDef[] = [
     { slug: "personal-info", name: "Personal Info", component: PersonalInfoForm },
     { slug: "assets", name: "Assets", component: AssetsForm },
     { slug: "income", name: "Income", component: IncomeForm },
+    { slug: "debts", name: "Debts", component: DebtsForm },
     { slug: "expenditure", name: "Expenditure", component: IncomeNeedsForm },
     { slug: "one-offs", name: "One Offs", component: OneOffsForm },
     { slug: "assumptions", name: "Assumptions", component: AssumptionsForm },
