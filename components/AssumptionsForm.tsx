@@ -236,8 +236,8 @@ export default function AssumptionsForm({ data, setData }: Props) {
                 <p className="text-sm text-gray-500 mt-2">
                     When enabled, the projection will simulate the Bed and ISA process. Each year, up to the annual ISA
                     allowance per person is moved into the ISA — first by transferring taxable stocks (within the CGT
-                    allowance, gifting between spouses where helpful), then from age 55 by crystallising pension to take
-                    the 25% tax-free lump sum.
+                    allowance, gifting between partners where helpful), then from age 55 by crystallising pension to
+                    take the 25% tax-free lump sum.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div className="flex flex-col gap-2">

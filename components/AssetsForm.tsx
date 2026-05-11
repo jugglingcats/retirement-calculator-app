@@ -300,7 +300,7 @@ export default function AssetsForm({ data, setData }: Props) {
                                             <div>
                                                 {displayData.belongsToSpouse && (
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                        Spouse
+                                                        Partner
                                                     </span>
                                                 )}
                                             </div>

@@ -346,7 +346,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <label className="text-sm font-medium text-gray-700">
-                                                Limit (today&apos;s moneyx)
+                                                Limit (today&apos;s money)
                                             </label>
                                             <NumericInput
                                                 placeholder="No cap"
@@ -469,7 +469,7 @@ export default function IncomeForm({ data, setData }: Props) {
                                             )}
                                             {displayData.belongsToSpouse && (
                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                    Spouse
+                                                    Partner
                                                 </span>
                                             )}
                                         </div>
